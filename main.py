@@ -1,8 +1,12 @@
-from fastapi import FastAPI, UploadFile, File
-from fastapi.responses import PlainTextResponse
-from typing import List
+from fastapi import FastAPI, UploadFile, File, Form, Request, APIRouter, Body, status, HTTPException
+from fastapi.responses import PlainTextResponse, JSONResponse
+from fastapi.datastructures import UploadFile as FastAPIUploadFile
+from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
+from typing import List, Dict, Optional, Any
 import tempfile
 import os
+import json
 from pypdf import PdfReader, PdfWriter
 from dotenv import load_dotenv
 import azure.ai.documentintelligence as adi
@@ -108,3 +112,37 @@ async def pdf_to_markdown(file: UploadFile = File(...)):
             except Exception:
                 pass
     return combined_md
+
+@app.post("/compose-prompt", response_class=PlainTextResponse)
+async def compose_prompt(request: Request):
+    """
+    Accepts a multipart/form-data request with:
+    - A 'mapping' JSON field: {"tag1": "string or filename", ...}
+    - Optional files: each with their field name matching a tag or filename in the mapping.
+    For each tag, if a file is uploaded for the value, use its contents; otherwise, use the string directly.
+    """
+    # Parse multipart form
+    form = await request.form()
+    # Extract mapping JSON from form
+    mapping_json = form.get("mapping")
+    if mapping_json is None:
+        raise HTTPException(status_code=400, detail="Missing 'mapping' field in form data.")
+    try:
+        mapping = json.loads(mapping_json)
+    except Exception:
+        raise HTTPException(status_code=400, detail="'mapping' field is not valid JSON.")
+    # Prepare result
+    composed_sections = []
+    for tag, value in mapping.items():
+        # If value matches a file field in the form, use file contents
+        file_obj = form.get(value)
+        if isinstance(file_obj, FastAPIUploadFile):
+            file_bytes = await file_obj.read()
+            content = file_bytes.decode("utf-8", errors="replace")
+        else:
+            # Otherwise treat value as string content
+            content = value
+        wrapped = f"<{tag}>\n{content}\n</{tag}>"
+        composed_sections.append(wrapped)
+    combined = "\n\n".join(composed_sections)
+    return combined
