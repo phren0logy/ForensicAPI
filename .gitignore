@@ -1,0 +1,103 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+egg-info/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pyenv
+.python-version
+
+# mypy
+.mypy_cache/
+.dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# VS Code
+.vscode/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+._*
+.Spotlight-V100
+.Trashes
+*.swp
+.DS_Store?
+._.DS_Store
+
+# macOS resource forks
+._*
+
+# macOS metadata files
+.metadata_never_index
+.fseventsd
+
+# uv package manager
+.uv/
+.uv-cache/
+.uv-env/
+uv.lock
+
+# FastAPI static files
+static/
+
+# Environment variables
+.env
+.env.*
+*.env
+
+# Local development
+*.log
+
+# Ignore SQLite database files
+db.sqlite3
+*.sqlite3
+
+# Ignore test output
+*.tmp
+*.temp
+
+# Ignore wheel files
+*.whl
