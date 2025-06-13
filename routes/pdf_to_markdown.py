@@ -1,18 +1,21 @@
-from fastapi import APIRouter, UploadFile, File
-from fastapi.responses import PlainTextResponse
-from typing import List
-import tempfile
-import os
-import json
-from pypdf import PdfReader, PdfWriter
-import azure.ai.documentintelligence as adi
 import asyncio
+import json
+import os
+import tempfile
+from typing import List
+
+import azure.ai.documentintelligence as adi
 from azure.core.credentials import AzureKeyCredential
+from fastapi import APIRouter, File, UploadFile
+from fastapi.responses import PlainTextResponse
+from pypdf import PdfReader, PdfWriter
+
 from utils import ensure_env_loaded
 
 router = APIRouter()
 
 MAX_PDF_PAGES = 2000
+
 
 def split_pdf_recursive(input_path: str, max_pages: int = MAX_PDF_PAGES) -> List[str]:
     reader = PdfReader(input_path)
@@ -36,20 +39,25 @@ def split_pdf_recursive(input_path: str, max_pages: int = MAX_PDF_PAGES) -> List
                 pass
         return temp_files
 
+
 def extract_markdown_from_layout_result(result) -> str:
     markdown = []
     for page in result.pages:
-        for line in getattr(page, 'lines', []):
+        for line in getattr(page, "lines", []):
             markdown.append(line.content)
     return "\n".join(markdown)
 
-def analyze_pdf_chunk_azure(chunk_path: str, client: adi.DocumentIntelligenceClient) -> str:
+
+def analyze_pdf_chunk_azure(
+    chunk_path: str, client: adi.DocumentIntelligenceClient
+) -> str:
     with open(chunk_path, "rb") as f:
         poller = client.begin_analyze_document(
             "prebuilt-layout", f, content_type="application/pdf"
         )
         result = poller.result()
     return extract_markdown_from_layout_result(result)
+
 
 @router.post("/pdf-to-markdown", response_class=PlainTextResponse)
 async def pdf_to_markdown(file: UploadFile = File(...)):
@@ -75,9 +83,12 @@ async def pdf_to_markdown(file: UploadFile = File(...)):
             pass
     try:
         import anyio
+
         markdown_chunks = []
         for chunk_path in chunk_paths:
-            md = await anyio.to_thread.run_sync(analyze_pdf_chunk_azure, chunk_path, client)
+            md = await anyio.to_thread.run_sync(
+                analyze_pdf_chunk_azure, chunk_path, client
+            )
             markdown_chunks.append(md)
         combined_md = "\n\n".join(markdown_chunks)
     finally:
@@ -87,3 +98,14 @@ async def pdf_to_markdown(file: UploadFile = File(...)):
             except Exception:
                 pass
     return combined_md
+
+
+# TODO: add minimal error handling for debugging
+# @router.post("/pdf-to-markdown", response_class=PlainTextResponse)
+# @router.post("/pdf-to-markdown", response_class=PlainTextResponse)
+# async def pdf_to_markdown(file: UploadFile = File(...)):
+#     try:
+#         ...existing logic...
+#         return combined_md
+#     except Exception as e:
+#         return f"Error: {str(e)}"

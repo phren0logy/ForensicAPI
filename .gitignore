@@ -101,3 +101,5 @@ db.sqlite3
 
 # Ignore wheel files
 *.whl
+
+*.sesskey

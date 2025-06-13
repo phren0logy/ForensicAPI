@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>PDF to Markdown Test</title>
+  </head>
+  <body>
+    <h1>PDF to Markdown Test</h1>
+    <form action="/pdf-test" method="post" enctype="multipart/form-data">
+      <input type="file" name="file" accept="application/pdf" required />
+      <button type="submit">Upload and Convert</button>
+    </form>
+    {% if markdown %}
+    <h2>Result</h2>
+    <a
+      href="data:text/markdown;charset=utf-8,{{ markdown | urlencode }}"
+      download="converted.md"
+      >Download Markdown</a
+    >
+    <pre>{{ markdown }}</pre>
+    {% endif %}
+  </body>
+</html>

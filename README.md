@@ -1,30 +1,59 @@
 # FastAPI Reusable Prototyping App
 
+## Test the Endpoints with Built-in HTML Pages
+
+This project includes simple HTML forms for testing endpoints.
+
+### How to Use:
+
+1. **Start the FastAPI server:**
+
+   ```
+   uv run run.py
+   ```
+
+   or
+
+   ```
+   uvicorn main:app --reload
+   ```
+
+2. **Visit the test pages in your browser:**
+
+   - [PDF to Markdown Test](http://127.0.0.1:8000/pdf-test)
+   - [Prompt Composer Test](http://127.0.0.1:8000/prompt-test)
+
+3. **PDF to Markdown Test**
+
+   - Upload a PDF file and download the converted markdown.
+
+4. **Prompt Composer Test**
+   - Fill in the fields and submit to see the composed prompt result.
+
+---
+
 ## Getting Started
 
 ### Prerequisites
+
 - Python 3.8+
 - Install dependencies using [uv](https://github.com/astral-sh/uv):
   ```sh
-  uv pip install -r requirements.txt
+  uv sync
   ```
 
 ### Running the Server
 
-To start only the FastAPI backend:
+To start the FastAPI server:
+
 ```sh
 uv run run.py
 ```
 
-To start both the FastAPI backend and the MonsterUI test page:
-```sh
-uv run run.py -- --with-frontend
-```
-- The `--with-frontend` flag launches a UI test page at a separate port for interactive testing.
-
 ## API Endpoints
 
 ### `/compose-prompt` (POST)
+
 - **Description:** Compose a prompt from multiple text fields and/or files, each wrapped in a specified XML tag.
 - **Request:**
   - `multipart/form-data` with a `mapping` field (JSON: `{tag: value}`), where each key is an XML tag and the value is either:
@@ -46,15 +75,13 @@ uv run run.py -- --with-frontend
   ```
 
 ### `/pdf-to-markdown` (POST)
+
 - **Description:** Converts an uploaded PDF to Markdown using Azure Document Intelligence.
 - **Request:**
   - `multipart/form-data` with a single file field named `file` (PDF file).
 - **Response:**
   - Plain text: Extracted Markdown content.
 
-## Testing
-- For a simple UI to test `/compose-prompt`, start with `--with-frontend` and open the MonsterUI test page.
-- You can also use tools like Postman or curl to test endpoints directly.
-
 ---
+
 For questions or issues, please contact the project maintainer.
