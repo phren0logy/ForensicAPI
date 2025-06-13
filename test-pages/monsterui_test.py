@@ -40,7 +40,7 @@ async def index(document: str = '', transcript: str = '', manual: str = '', inst
             ),
             Div(
                 H2("Combined Result:"),
-                Pre(combined_result or "(Result will appear here)")
+                Pre(combined_result or "(Result will appear here)", style="white-space: pre-wrap; word-break: break-word;")
             )
         )
     )
