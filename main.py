@@ -133,16 +133,21 @@ async def compose_prompt(request: Request):
         raise HTTPException(status_code=400, detail="'mapping' field is not valid JSON.")
     # Prepare result
     composed_sections = []
+    instructions_section = None
     for tag, value in mapping.items():
-        # If value matches a file field in the form, use file contents
         file_obj = form.get(value)
         if isinstance(file_obj, FastAPIUploadFile):
             file_bytes = await file_obj.read()
             content = file_bytes.decode("utf-8", errors="replace")
         else:
-            # Otherwise treat value as string content
             content = value
         wrapped = f"<{tag}>\n{content}\n</{tag}>"
-        composed_sections.append(wrapped)
-    combined = "\n\n".join(composed_sections)
+        if tag.lower() == "instructions":
+            instructions_section = wrapped
+        else:
+            composed_sections.append(wrapped)
+    if instructions_section:
+        combined = f"{instructions_section}\n\n" + "\n\n".join(composed_sections) + f"\n\n{instructions_section}"
+    else:
+        combined = "\n\n".join(composed_sections)
     return combined

@@ -7,11 +7,11 @@ hdrs = Theme.blue.headers()
 app, rt = fast_app(hdrs=hdrs)
 
 @rt
-async def index(document: str = '', transcript: str = '', manual: str = '', result: str = '', submit: str = None):
+async def index(document: str = '', transcript: str = '', manual: str = '', instructions: str = '', result: str = '', submit: str = None):
     combined_result = result
     if submit:
         # On form submit, call backend and get combined result
-        mapping = {'document': document, 'transcript': transcript, 'manual': manual}
+        mapping = {'document': document, 'transcript': transcript, 'manual': manual, 'instructions': instructions}
         async with httpx.AsyncClient() as client:
             data = {'mapping': json.dumps(mapping)}
             resp = await client.post('http://127.0.0.1:8000/compose-prompt', data=data)
@@ -31,6 +31,10 @@ async def index(document: str = '', transcript: str = '', manual: str = '', resu
                 Div(
                     Label("Manual:"),
                     Input(name="manual", value=manual, type="text"),
+                ),
+                Div(
+                    Label("Instructions:"),
+                    Input(name="instructions", value=instructions, type="text"),
                 ),
                 Button("Submit", type="submit", name="submit", value="1"),
             ),
