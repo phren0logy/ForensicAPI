@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 import os
 import tempfile
 from typing import List
@@ -13,6 +14,8 @@ from pypdf import PdfReader, PdfWriter
 from utils import ensure_env_loaded
 
 router = APIRouter()
+
+logger = logging.getLogger(__name__)
 
 MAX_PDF_PAGES = 2000
 
@@ -61,10 +64,12 @@ def analyze_pdf_chunk_azure(
 
 @router.post("/pdf-to-markdown", response_class=PlainTextResponse)
 async def pdf_to_markdown(file: UploadFile = File(...)):
+    logger.info("/pdf-to-markdown endpoint called")
     ensure_env_loaded()
     endpoint = os.getenv("AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT")
     key = os.getenv("AZURE_DOCUMENT_INTELLIGENCE_KEY")
     if not endpoint or not key:
+        logger.warning("Azure Document Intelligence endpoint/key not set in .env")
         return "Azure Document Intelligence endpoint/key not set in .env"
     client = adi.DocumentIntelligenceClient(
         endpoint=endpoint,
@@ -72,6 +77,7 @@ async def pdf_to_markdown(file: UploadFile = File(...)):
     )
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_in:
         contents = await file.read()
+        logger.info(f"Received file: {file.filename}, size: {len(contents)} bytes")
         temp_in.write(contents)
         temp_in.flush()
         temp_path = temp_in.name
@@ -86,11 +92,18 @@ async def pdf_to_markdown(file: UploadFile = File(...)):
 
         markdown_chunks = []
         for chunk_path in chunk_paths:
-            md = await anyio.to_thread.run_sync(
-                analyze_pdf_chunk_azure, chunk_path, client
-            )
-            markdown_chunks.append(md)
+            try:
+                md = await anyio.to_thread.run_sync(
+                    analyze_pdf_chunk_azure, chunk_path, client
+                )
+                markdown_chunks.append(md)
+            except Exception as e:
+                logger.error(f"Error analyzing chunk {chunk_path}: {e}")
+                return f"Error analyzing PDF chunk: {str(e)}"
         combined_md = "\n\n".join(markdown_chunks)
+    except Exception as e:
+        logger.error(f"Error processing PDF: {e}")
+        return f"Error processing PDF: {str(e)}"
     finally:
         for p in chunk_paths:
             try:
@@ -98,14 +111,3 @@ async def pdf_to_markdown(file: UploadFile = File(...)):
             except Exception:
                 pass
     return combined_md
-
-
-# TODO: add minimal error handling for debugging
-# @router.post("/pdf-to-markdown", response_class=PlainTextResponse)
-# @router.post("/pdf-to-markdown", response_class=PlainTextResponse)
-# async def pdf_to_markdown(file: UploadFile = File(...)):
-#     try:
-#         ...existing logic...
-#         return combined_md
-#     except Exception as e:
-#         return f"Error: {str(e)}"

@@ -1,3 +1,4 @@
+import logging
 from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import PlainTextResponse
 from fastapi.datastructures import UploadFile as FastAPIUploadFile
@@ -5,8 +6,11 @@ import json
 
 router = APIRouter()
 
+logger = logging.getLogger(__name__)
+
 @router.post("/compose-prompt", response_class=PlainTextResponse)
 async def compose_prompt(request: Request):
+    logger.info("/compose-prompt endpoint called")
     """
     Accepts a multipart/form-data request with:
     - A 'mapping' JSON field: {"tag1": "string or filename", ...}
@@ -16,6 +20,7 @@ async def compose_prompt(request: Request):
     form = await request.form()
     mapping_json = form.get("mapping")
     if mapping_json is None:
+        logger.warning("No mapping field provided in form data")
         raise HTTPException(status_code=400, detail="Missing 'mapping' field in form data.")
     try:
         mapping = json.loads(mapping_json)
@@ -39,4 +44,5 @@ async def compose_prompt(request: Request):
         combined = f"{instructions_section}\n\n" + "\n\n".join(composed_sections) + f"\n\n{instructions_section}"
     else:
         combined = "\n\n".join(composed_sections)
+    logger.info("Prompt composition complete")
     return combined
