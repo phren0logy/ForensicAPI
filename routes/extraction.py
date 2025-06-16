@@ -39,14 +39,17 @@ def stitch_analysis_results(
         return new_result
 
     content_offset = len(stitched_result["content"])
-    new_result["content"] = stitched_result["content"] + new_result["content"]
+    concatenated_content = stitched_result["content"] + new_result["content"]
 
     # Update spans and page numbers in all relevant elements
     for element_list_key in ["pages", "paragraphs", "tables", "words", "lines", "selectionMarks"]:
         for element in new_result.get(element_list_key, []):
+            # Handle both "spans" (for paragraphs, lines, etc.) and "span" (for words)
             if "spans" in element:
                 for span in element["spans"]:
                     span["offset"] += content_offset
+            elif "span" in element:
+                element["span"]["offset"] += content_offset
             if "pageNumber" in element:
                 element["pageNumber"] += page_offset
             if "boundingRegions" in element:
@@ -55,9 +58,11 @@ def stitch_analysis_results(
 
     # Append the updated elements to the stitched result
     for key in ["pages", "paragraphs", "tables", "words", "lines", "selectionMarks"]:
-        stitched_result.get(key, []).extend(new_result.get(key, []))
+        if key not in stitched_result:
+            stitched_result[key] = []
+        stitched_result[key].extend(new_result.get(key, []))
 
-    stitched_result["content"] = new_result["content"]
+    stitched_result["content"] = concatenated_content
     return stitched_result
 
 
