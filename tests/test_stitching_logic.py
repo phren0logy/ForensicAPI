@@ -778,3 +778,331 @@ def ground_truth_result():
     fixture_path = os.path.join(os.path.dirname(__file__), "fixtures", "ground_truth_result.json")
     with open(fixture_path, 'r') as f:
         return json.load(f)
+
+
+# Phase 4 Fixtures - Full Document Testing
+@pytest.fixture
+def all_batch_fixtures():
+    """Load all 8 batch files in the correct order for full document reconstruction."""
+    fixtures_dir = os.path.join(os.path.dirname(__file__), "fixtures")
+    batch_files = [
+        "batch_1-50.json",
+        "batch_51-100.json", 
+        "batch_101-150.json",
+        "batch_151-200.json",
+        "batch_201-250.json",
+        "batch_251-300.json",
+        "batch_301-350.json",
+        "batch_351-353.json"
+    ]
+    
+    batches = []
+    for batch_file in batch_files:
+        batch_path = os.path.join(fixtures_dir, batch_file)
+        with open(batch_path, 'r') as f:
+            batches.append(json.load(f))
+    
+    return batches
+
+
+@pytest.fixture
+def ground_truth_full():
+    """Load the ground truth result fixture."""
+    fixture_path = os.path.join(os.path.dirname(__file__), "fixtures", "ground_truth_result.json")
+    with open(fixture_path, 'r') as f:
+        return json.load(f)
+
+
+def create_stitched_full_document(all_batch_fixtures):
+    """Create the full stitched document (helper function for individual tests)."""
+    # Start with first batch
+    result = all_batch_fixtures[0].copy()
+    
+    # Stitch all remaining batches sequentially
+    for i, batch in enumerate(all_batch_fixtures[1:], 1):
+        result = stitch_analysis_results(result, batch.copy())
+    
+    return result
+
+
+class TestPhase4FullDocumentStitching:
+    """Phase 4: Full document stitching tests with complete 353-page validation."""
+
+    def test_full_document_sequential_stitching_basic(self, all_batch_fixtures):
+        """Test basic sequential stitching of all 7 batches to reconstruct the full 353-page document."""
+        # Track progress
+        import time
+        start_time = time.time()
+        
+        # Start with the first batch
+        result = all_batch_fixtures[0].copy()
+        initial_pages = len(result["pages"])
+        initial_paragraphs = len(result["paragraphs"])
+        
+        # Stitch all remaining batches sequentially using automatic offset calculation
+        for i, batch in enumerate(all_batch_fixtures[1:], 1):
+            batch_copy = batch.copy()  # Don't modify original fixtures
+            
+            # Track batch info before stitching
+            batch_pages = len(batch_copy["pages"])
+            batch_paragraphs = len(batch_copy["paragraphs"])
+            
+            # Perform stitching with automatic offset calculation
+            result = stitch_analysis_results(result, batch_copy)
+            
+            # Verify incremental progress
+            expected_total_pages = initial_pages + sum(len(b["pages"]) for b in all_batch_fixtures[1:i+1])
+            assert len(result["pages"]) == expected_total_pages, f"Page count mismatch after batch {i+1}"
+            
+            print(f"Batch {i+1} stitched: +{batch_pages} pages, +{batch_paragraphs} paragraphs")
+        
+        end_time = time.time()
+        execution_time = end_time - start_time
+        
+        # Verify final document structure
+        assert len(result["pages"]) == 353, "Final document should have exactly 353 pages"
+        assert result["pages"][0]["pageNumber"] == 1, "First page should be numbered 1"
+        assert result["pages"][-1]["pageNumber"] == 353, "Last page should be numbered 353"
+        
+        # Verify page numbering is consecutive
+        page_numbers = [page["pageNumber"] for page in result["pages"]]
+        expected_pages = list(range(1, 354))  # 1 through 353
+        assert page_numbers == expected_pages, "Page numbers should be consecutive from 1 to 353"
+        
+        # Verify content is substantial
+        assert len(result["content"]) > 800000, "Full document content should be substantial (>800KB)"
+        assert "DRACULA" in result["content"], "Content should contain the book title"
+        
+        # Performance validation
+        assert execution_time < 60, f"Stitching should complete in under 60 seconds, took {execution_time:.2f}s"
+        
+        print(f"✅ Full document stitching successful: 353 pages in {execution_time:.2f} seconds")
+
+    def test_full_document_structure_integrity(self, all_batch_fixtures, ground_truth_full):
+        """Validate that the stitched result maintains all structural elements correctly."""
+        result = create_stitched_full_document(all_batch_fixtures)
+        ground_truth = ground_truth_full
+        
+        # Critical structural validation
+        assert "content" in result, "Stitched result must have content field"
+        assert "pages" in result, "Stitched result must have pages field"
+        assert "paragraphs" in result, "Stitched result must have paragraphs field"
+        
+        # Page count validation
+        assert len(result["pages"]) == len(ground_truth["pages"]), \
+            f"Page count mismatch: {len(result['pages'])} vs {len(ground_truth['pages'])}"
+        
+        # Element count validation
+        result_paragraphs = len(result["paragraphs"])
+        gt_paragraphs = len(ground_truth["paragraphs"])
+        assert result_paragraphs == gt_paragraphs, \
+            f"Paragraph count mismatch: {result_paragraphs} vs {gt_paragraphs}"
+        
+        # Content length validation (should be very close)
+        result_length = len(result["content"])
+        gt_length = len(ground_truth["content"])
+        length_diff = abs(result_length - gt_length)
+        length_tolerance = max(100, gt_length * 0.001)  # 0.1% tolerance or 100 chars
+        assert length_diff <= length_tolerance, \
+            f"Content length differs by {length_diff} chars (>{length_tolerance} tolerance)"
+        
+        # Verify other element types if they exist
+        for element_type in ["tables", "words", "lines", "selectionMarks"]:
+            if element_type in ground_truth:
+                assert element_type in result, f"Missing element type: {element_type}"
+                result_count = len(result[element_type])
+                gt_count = len(ground_truth[element_type])
+                assert result_count == gt_count, \
+                    f"{element_type} count mismatch: {result_count} vs {gt_count}"
+        
+        print(f"✅ Structure integrity validated: {len(result['pages'])} pages, {len(result['paragraphs'])} paragraphs")
+
+    def test_full_document_content_samples(self, all_batch_fixtures, ground_truth_full):
+        """Validate content accuracy using strategic sampling across the document."""
+        result = create_stitched_full_document(all_batch_fixtures)
+        ground_truth = ground_truth_full
+        
+        # Beginning content validation (first 500 characters)
+        result_start = result["content"][:500]
+        gt_start = ground_truth["content"][:500]
+        assert result_start == gt_start, "First 500 characters should match exactly"
+        
+        # End content validation (last 500 characters)
+        result_end = result["content"][-500:]
+        gt_end = ground_truth["content"][-500:]
+        assert result_end == gt_end, "Last 500 characters should match exactly"
+        
+        # Validate key content markers and structure
+        chapter_count_result = result["content"].count("CHAPTER")
+        chapter_count_gt = ground_truth["content"].count("CHAPTER")
+        assert chapter_count_result == chapter_count_gt, \
+            f"Chapter count mismatch: {chapter_count_result} vs {chapter_count_gt}"
+        
+        # Validate document starts correctly
+        assert result["content"].startswith("# DRACULA"), "Document should start with DRACULA title"
+        
+        # Validate content length is very close (within 1% tolerance)
+        result_length = len(result["content"])
+        gt_length = len(ground_truth["content"])
+        length_diff = abs(result_length - gt_length)
+        tolerance = max(100, gt_length * 0.01)  # 1% or 100 chars minimum
+        assert length_diff <= tolerance, \
+            f"Content length differs by {length_diff} chars (tolerance: {tolerance})"
+        
+        # Validate key structural elements are present
+        assert "Jonathan Harker" in result["content"], "Should contain character names"
+        assert "Van Helsing" in result["content"], "Should contain character names"
+        assert "Mina" in result["content"], "Should contain character names"
+        assert "Castle Dracula" in result["content"] or "castle" in result["content"].lower(), "Should contain castle references"
+        
+        print(f"✅ Content samples validated: start/end exact match, {chapter_count_result} chapters, length within tolerance")
+
+    def test_full_document_span_offset_precision(self, all_batch_fixtures):
+        """Verify span offset calculations are accurate across all 353 pages."""
+        result = create_stitched_full_document(all_batch_fixtures)
+        
+        # Collect all spans with their page numbers
+        span_info = []
+        for paragraph in result["paragraphs"]:
+            for region in paragraph.get("boundingRegions", []):
+                page_num = region["pageNumber"]
+                for span in paragraph.get("spans", []):
+                    span_info.append({
+                        "page": page_num,
+                        "offset": span["offset"],
+                        "length": span["length"]
+                    })
+        
+        # Verify spans are monotonically increasing
+        prev_offset = -1
+        for i, span in enumerate(span_info):
+            assert span["offset"] >= prev_offset, \
+                f"Span {i} has offset {span['offset']} < previous {prev_offset}"
+            prev_offset = span["offset"]
+        
+        # Verify spans don't exceed content length
+        content_length = len(result["content"])
+        for span in span_info:
+            span_end = span["offset"] + span["length"]
+            assert span_end <= content_length, \
+                f"Span extends beyond content: offset {span['offset']} + length {span['length']} > {content_length}"
+        
+        # Verify spans at critical page boundaries (pages 50, 100, 150, 200, 250, 300)
+        boundary_pages = [50, 100, 150, 200, 250, 300]
+        boundary_spans = {page: [] for page in boundary_pages}
+        
+        for span in span_info:
+            if span["page"] in boundary_pages:
+                boundary_spans[span["page"]].append(span)
+        
+        # Verify each boundary has spans and they're reasonable
+        for page in boundary_pages:
+            spans = boundary_spans[page]
+            assert len(spans) > 0, f"Page {page} should have at least one span"
+            
+            # Verify spans for this page don't have negative offsets
+            for span in spans:
+                assert span["offset"] >= 0, f"Page {page} has negative span offset: {span['offset']}"
+        
+        # Cross-boundary validation - spans should increase across page boundaries
+        for i in range(len(boundary_pages) - 1):
+            current_page = boundary_pages[i]
+            next_page = boundary_pages[i + 1]
+            
+            current_max_offset = max(s["offset"] for s in boundary_spans[current_page])
+            next_min_offset = min(s["offset"] for s in boundary_spans[next_page])
+            
+            assert next_min_offset >= current_max_offset, \
+                f"Span offsets don't increase across pages {current_page}->{next_page}: {current_max_offset} -> {next_min_offset}"
+        
+        print(f"✅ Span precision validated: {len(span_info)} spans across 353 pages, all monotonic")
+
+    def test_full_document_performance_metrics(self, all_batch_fixtures):
+        """Benchmark performance and memory usage for production readiness."""
+        import os
+        import time
+
+        import psutil
+        
+        # Get initial memory usage
+        process = psutil.Process(os.getpid())
+        initial_memory = process.memory_info().rss / 1024 / 1024  # MB
+        
+        # Track timing for each batch
+        batch_times = []
+        start_time = time.time()
+        
+        # Perform stitching with timing
+        result = all_batch_fixtures[0].copy()
+        
+        for i, batch in enumerate(all_batch_fixtures[1:], 1):
+            batch_start = time.time()
+            batch_copy = batch.copy()
+            result = stitch_analysis_results(result, batch_copy)
+            batch_end = time.time()
+            
+            batch_time = batch_end - batch_start
+            batch_times.append(batch_time)
+            
+            # Check memory usage
+            current_memory = process.memory_info().rss / 1024 / 1024  # MB
+            memory_increase = current_memory - initial_memory
+            
+            print(f"Batch {i+1}: {batch_time:.2f}s, Memory: {current_memory:.1f}MB (+{memory_increase:.1f}MB)")
+            
+            # Memory shouldn't grow excessively (allow up to 500MB increase)
+            assert memory_increase < 500, f"Memory usage grew too much: {memory_increase:.1f}MB"
+        
+        total_time = time.time() - start_time
+        final_memory = process.memory_info().rss / 1024 / 1024
+        total_memory_increase = final_memory - initial_memory
+        
+        # Performance assertions
+        assert total_time < 30, f"Total stitching time {total_time:.2f}s exceeds 30s limit"
+        assert max(batch_times) < 10, f"Longest batch took {max(batch_times):.2f}s, should be <10s"
+        assert total_memory_increase < 1000, f"Total memory increase {total_memory_increase:.1f}MB too high"
+        
+        # Performance summary
+        avg_batch_time = sum(batch_times) / len(batch_times)
+        print(f"✅ Performance validated:")
+        print(f"   Total time: {total_time:.2f}s")
+        print(f"   Avg batch time: {avg_batch_time:.2f}s")
+        print(f"   Memory increase: {total_memory_increase:.1f}MB")
+        print(f"   Final document: {len(result['pages'])} pages, {len(result['content'])} chars")
+
+    def test_full_document_with_validation_enabled(self, all_batch_fixtures):
+        """Test full stitching with all validation features enabled."""
+        # This test verifies that validation doesn't break the stitching process
+        # and that all batches pass validation
+        
+        # Start with first batch
+        result = all_batch_fixtures[0].copy()
+        
+        # Validate first batch structure
+        validate_batch_structure(result)
+        
+        # Stitch remaining batches with validation enabled
+        for i, batch in enumerate(all_batch_fixtures[1:], 1):
+            batch_copy = batch.copy()
+            
+            # Validate batch structure before stitching
+            validate_batch_structure(batch_copy)
+            
+            # Stitch with validation enabled (default)
+            result = stitch_analysis_results(result, batch_copy, validate_inputs=True)
+            
+            # Verify result still has valid structure
+            assert "content" in result
+            assert "pages" in result
+            assert len(result["pages"]) > 0
+        
+        # Final validation - verify batches are properly structured
+        # Each individual batch should be valid (already tested above)
+        # The sequence validation is implicit in the successful stitching
+        
+        # Verify final result
+        assert len(result["pages"]) == 353
+        page_numbers = [page["pageNumber"] for page in result["pages"]]
+        assert page_numbers == list(range(1, 354))
+        
+        print(f"✅ Validation enabled test passed: all {len(all_batch_fixtures)} batches validated and stitched")
