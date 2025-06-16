@@ -82,6 +82,30 @@ uv run run.py
 - **Response:**
   - Plain text: Extracted Markdown content.
 
+### `/extract` (POST)
+
+- **Description:** Extracts structured data and markdown from a PDF document using Azure Document Intelligence. It processes the PDF in batches to handle very large documents and stitches the results together into a single, cohesive output.
+- **Request:**
+  - `multipart/form-data` with a single file field named `file` (PDF file).
+- **Response:**
+  - A JSON object containing two keys:
+    - `markdown_content`: A string with the full markdown of the entire document.
+    - `analysis_result`: The complete, stitched JSON analysis result from Azure, as if the entire document was processed in a single call.
+
+### `/segment` (POST)
+
+- **Description:** Accepts a full analysis result from the `/extract` endpoint and segments it into rich, structurally-aware chunks based on token count and document hierarchy (headings).
+- **Request:**
+  - A JSON object with the following structure:
+    ```json
+    {
+      "source_file": "string",
+      "analysis_result": { "... a large JSON object ..." }
+    }
+    ```
+- **Response:**
+  - A JSON array of "Rich Segment" objects. Each object includes a segment ID, token count, the structural context (headings), and the list of document elements belonging to that segment.
+
 ---
 
 For questions or issues, please contact the project maintainer.
