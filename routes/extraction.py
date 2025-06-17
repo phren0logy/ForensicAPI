@@ -4,13 +4,14 @@ import os
 import tempfile
 from typing import Any, Dict, List, Optional, Tuple
 
-import azure.ai.documentintelligence as adi
+from azure.ai.documentintelligence.aio import (
+    DocumentIntelligenceClient as AsyncDocumentIntelligenceClient,
+)
 from azure.ai.documentintelligence.models import AnalyzeResult
 from azure.core.credentials import AzureKeyCredential
 from fastapi import APIRouter, File, UploadFile
 from fastapi.responses import JSONResponse
 from pypdf import PdfReader
-
 from utils import ensure_env_loaded
 
 router = APIRouter()
@@ -185,7 +186,7 @@ def stitch_analysis_results(
 
 
 async def analyze_pdf_in_batches(
-    file_path: str, client: adi.DocumentIntelligenceClient, batch_size: int
+    file_path: str, client: AsyncDocumentIntelligenceClient, batch_size: int
 ) -> Tuple[Dict[str, Any], str]:
     """
     Analyzes a PDF in batches and stitches the results together.
@@ -199,8 +200,7 @@ async def analyze_pdf_in_batches(
         logger.info(f"Starting analysis of page range: {page_range_str}")
         with open(file_path, "rb") as f:
             logger.info(f"File opened for range {page_range_str}")
-            poller = await asyncio.to_thread(
-                client.begin_analyze_document,
+            poller = await client.begin_analyze_document(
                 "prebuilt-layout",
                 f.read(),
                 pages=page_range_str,
@@ -258,7 +258,7 @@ async def extract(file: UploadFile = File(...), batch_size: int = 1500):
             status_code=500,
             content={"error": "Azure Document Intelligence endpoint/key not set"},
         )
-    client = adi.DocumentIntelligenceClient(
+    client = AsyncDocumentIntelligenceClient(
         endpoint=endpoint, credential=AzureKeyCredential(key)
     )
 
@@ -269,15 +269,16 @@ async def extract(file: UploadFile = File(...), batch_size: int = 1500):
         temp_path = temp_file.name
 
     try:
-        analysis_result, markdown_content = await analyze_pdf_in_batches(
-            temp_path, client, batch_size
-        )
-        return JSONResponse(
-            content={
-                "markdown_content": markdown_content,
-                "analysis_result": analysis_result,
-            }
-        )
+        async with client:
+            analysis_result, markdown_content = await analyze_pdf_in_batches(
+                temp_path, client, batch_size
+            )
+            return JSONResponse(
+                content={
+                    "markdown_content": markdown_content,
+                    "analysis_result": analysis_result,
+                }
+            )
     except Exception as e:
         logger.error(f"Error during PDF extraction: {e}", exc_info=True)
         return JSONResponse(
