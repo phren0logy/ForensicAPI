@@ -1,0 +1,194 @@
+{
+  "apiVersion": "2024-11-30",
+  "modelId": "prebuilt-layout",
+  "stringIndexType": "textElements",
+  "content": "Test Document\n\nThis is a simple test document with minimal content for testing the filtering functionality.\n\nSection 1: Basic Content\nThis section contains basic paragraph content that should be preserved during filtering.\n\nSection 2: Tables\n| Header 1 | Header 2 |\n|----------|----------|\n| Cell 1   | Cell 2   |\n| Cell 3   | Cell 4   |",
+  "pages": [
+    {
+      "pageNumber": 1,
+      "angle": 0,
+      "width": 8.5,
+      "height": 11,
+      "unit": "inch",
+      "words": [
+        {
+          "content": "Test",
+          "polygon": [1.0, 1.0, 1.5, 1.0, 1.5, 1.2, 1.0, 1.2],
+          "confidence": 0.99,
+          "span": {"offset": 0, "length": 4}
+        },
+        {
+          "content": "Document",
+          "polygon": [1.6, 1.0, 2.5, 1.0, 2.5, 1.2, 1.6, 1.2],
+          "confidence": 0.99,
+          "span": {"offset": 5, "length": 8}
+        }
+      ],
+      "lines": [
+        {
+          "content": "Test Document",
+          "polygon": [1.0, 1.0, 2.5, 1.0, 2.5, 1.2, 1.0, 1.2],
+          "spans": [{"offset": 0, "length": 13}]
+        }
+      ],
+      "paragraphs": [
+        {
+          "_id": "para_1",
+          "content": "Test Document",
+          "role": "h1",
+          "boundingBox": {"x": 1.0, "y": 1.0, "width": 1.5, "height": 0.2},
+          "spans": [{"offset": 0, "length": 13}],
+          "confidence": 0.99
+        },
+        {
+          "_id": "para_2",
+          "content": "This is a simple test document with minimal content for testing the filtering functionality.",
+          "role": "paragraph",
+          "boundingBox": {"x": 1.0, "y": 1.5, "width": 6.5, "height": 0.3},
+          "spans": [{"offset": 15, "length": 91}],
+          "confidence": 0.98
+        },
+        {
+          "_id": "para_3",
+          "content": "Section 1: Basic Content",
+          "role": "h2",
+          "boundingBox": {"x": 1.0, "y": 2.0, "width": 2.5, "height": 0.2},
+          "spans": [{"offset": 108, "length": 24}],
+          "confidence": 0.99
+        },
+        {
+          "_id": "para_4",
+          "content": "This section contains basic paragraph content that should be preserved during filtering.",
+          "role": "paragraph",
+          "boundingBox": {"x": 1.0, "y": 2.5, "width": 6.5, "height": 0.3},
+          "spans": [{"offset": 133, "length": 88}],
+          "confidence": 0.97
+        },
+        {
+          "_id": "para_5",
+          "content": "Section 2: Tables",
+          "role": "h2",
+          "boundingBox": {"x": 1.0, "y": 3.0, "width": 2.0, "height": 0.2},
+          "spans": [{"offset": 223, "length": 17}],
+          "confidence": 0.99
+        }
+      ],
+      "tables": [
+        {
+          "_id": "table_1",
+          "rowCount": 3,
+          "columnCount": 2,
+          "boundingRegions": [
+            {
+              "pageNumber": 1,
+              "polygon": [1.0, 3.5, 4.0, 3.5, 4.0, 4.5, 1.0, 4.5]
+            }
+          ],
+          "cells": [
+            {
+              "kind": "columnHeader",
+              "rowIndex": 0,
+              "columnIndex": 0,
+              "content": "Header 1",
+              "boundingRegions": [{"pageNumber": 1}],
+              "spans": [{"offset": 241, "length": 8}],
+              "elements": ["/paragraphs/6"]
+            },
+            {
+              "kind": "columnHeader",
+              "rowIndex": 0,
+              "columnIndex": 1,
+              "content": "Header 2",
+              "boundingRegions": [{"pageNumber": 1}],
+              "spans": [{"offset": 252, "length": 8}],
+              "elements": ["/paragraphs/7"]
+            },
+            {
+              "kind": "content",
+              "rowIndex": 1,
+              "columnIndex": 0,
+              "content": "Cell 1",
+              "boundingRegions": [{"pageNumber": 1}],
+              "spans": [{"offset": 283, "length": 6}],
+              "elements": ["/paragraphs/8"]
+            },
+            {
+              "kind": "content",
+              "rowIndex": 1,
+              "columnIndex": 1,
+              "content": "Cell 2",
+              "boundingRegions": [{"pageNumber": 1}],
+              "spans": [{"offset": 294, "length": 6}],
+              "elements": ["/paragraphs/9"]
+            },
+            {
+              "kind": "content",
+              "rowIndex": 2,
+              "columnIndex": 0,
+              "content": "Cell 3",
+              "boundingRegions": [{"pageNumber": 1}],
+              "spans": [{"offset": 305, "length": 6}],
+              "elements": ["/paragraphs/10"]
+            },
+            {
+              "kind": "content",
+              "rowIndex": 2,
+              "columnIndex": 1,
+              "content": "Cell 4",
+              "boundingRegions": [{"pageNumber": 1}],
+              "spans": [{"offset": 316, "length": 6}],
+              "elements": ["/paragraphs/11"]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "paragraphs": [
+    {
+      "_id": "para_1",
+      "role": "h1",
+      "content": "Test Document",
+      "boundingRegions": [{"pageNumber": 1}]
+    },
+    {
+      "_id": "para_2",
+      "role": "paragraph",
+      "content": "This is a simple test document with minimal content for testing the filtering functionality.",
+      "boundingRegions": [{"pageNumber": 1}]
+    },
+    {
+      "_id": "para_3",
+      "role": "h2",
+      "content": "Section 1: Basic Content",
+      "boundingRegions": [{"pageNumber": 1}]
+    },
+    {
+      "_id": "para_4",
+      "role": "paragraph",
+      "content": "This section contains basic paragraph content that should be preserved during filtering.",
+      "boundingRegions": [{"pageNumber": 1}]
+    },
+    {
+      "_id": "para_5",
+      "role": "h2",
+      "content": "Section 2: Tables",
+      "boundingRegions": [{"pageNumber": 1}]
+    }
+  ],
+  "tables": [
+    {
+      "_id": "table_1",
+      "rowCount": 3,
+      "columnCount": 2,
+      "boundingRegions": [{"pageNumber": 1}]
+    }
+  ],
+  "styles": [
+    {
+      "isHandwritten": false,
+      "confidence": 0.95,
+      "spans": [{"offset": 0, "length": 322}]
+    }
+  ]
+}

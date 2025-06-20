@@ -37,8 +37,7 @@ class FilteredElement(BaseModel):
     columnIndex: Optional[int] = None
     columnHeader: Optional[str] = None
     
-    class Config:
-        populate_by_name = True
+    model_config = {"populate_by_name": True}
 
 class ElementMapping(BaseModel):
     """Mapping between filtered and original elements."""
@@ -282,8 +281,8 @@ def apply_filters(
     
     # Calculate filtered size
     filtered_data = {
-        "elements": [elem.dict() for elem in filtered_elements],
-        "mappings": [mapping.dict() for mapping in element_mappings]
+        "elements": [elem.model_dump() for elem in filtered_elements],
+        "mappings": [mapping.model_dump() for mapping in element_mappings]
     }
     filtered_json = json.dumps(filtered_data)
     filtered_size = len(filtered_json.encode('utf-8'))
