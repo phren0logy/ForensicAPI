@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 class FilterConfig(BaseModel):
     """Configuration for filtering Azure DI elements."""
-    filter_preset: str = "legal_analysis"
+    filter_preset: str = "llm_ready"  # Changed default to llm_ready
     essential_fields: List[str] = Field(default_factory=lambda: ["content", "role", "pageNumber"])
     contextual_fields: List[str] = Field(default_factory=list)
     excluded_patterns: List[str] = Field(default_factory=lambda: ["boundingBox", "spans", "confidence"])
@@ -59,25 +59,25 @@ class FilterMetrics(BaseModel):
 # --- Filter Presets ---
 
 FILTER_PRESETS = {
-    "legal_analysis": {
-        "essential_fields": ["content", "role", "pageNumber", "elementType"],
-        "contextual_fields": ["parentSection", "elementIndex"],
-        "excluded_patterns": ["boundingBox", "boundingPolygon", "spans", "confidence", "words", "styles"],
-    },
-    "content_extraction": {
-        "essential_fields": ["content", "pageNumber"],
-        "contextual_fields": ["role"],
-        "excluded_patterns": ["boundingBox", "boundingPolygon", "spans", "confidence", "words", "styles", "boundingRegions"],
-    },
-    "structured_qa": {
-        "essential_fields": ["content", "role", "pageNumber", "elementType"],
-        "contextual_fields": ["parentSection"],
-        "excluded_patterns": ["boundingBox", "spans", "confidence", "words"],
-    },
-    "minimal": {
-        "essential_fields": ["content", "pageNumber"],
+    "no_filter": {
+        "essential_fields": ["*"],  # Special case - include everything
         "contextual_fields": [],
-        "excluded_patterns": ["boundingBox", "boundingPolygon", "spans", "confidence", "words", "styles", "boundingRegions", "selectionMarks"],
+        "excluded_patterns": [],  # Don't exclude anything
+    },
+    "llm_ready": {
+        "essential_fields": ["content", "pageNumber", "role", "elementType"],
+        "contextual_fields": ["elementIndex", "pageHeader", "pageFooter", "parentSection"],
+        "excluded_patterns": ["boundingBox", "boundingPolygon", "spans", "confidence", "words", "styles", "polygon"],
+    },
+    "forensic_extraction": {
+        "essential_fields": ["content", "pageNumber", "role", "elementType", "pageHeader", "pageFooter"],
+        "contextual_fields": ["elementIndex", "parentSection", "documentMetadata"],
+        "excluded_patterns": ["boundingBox", "boundingPolygon", "spans", "confidence", "polygon", "styles"],
+    },
+    "citation_optimized": {
+        "essential_fields": ["content", "pageNumber"],
+        "contextual_fields": ["pageHeader", "pageFooter", "elementIndex"],
+        "excluded_patterns": ["boundingBox", "boundingPolygon", "spans", "confidence", "words", "styles", "polygon", "selectionMarks", "role", "elementType"],
     }
 }
 
@@ -136,9 +136,15 @@ def filter_element(
         filtered_data["id"] = element_id
     
     # Add essential fields
-    for field in config.essential_fields:
-        if field in element:
-            filtered_data[field] = element[field]
+    if "*" in config.essential_fields:
+        # Special case: include all fields except those explicitly excluded
+        for field, value in element.items():
+            if not should_exclude_field(field, config.excluded_patterns):
+                filtered_data[field] = value
+    else:
+        for field in config.essential_fields:
+            if field in element:
+                filtered_data[field] = element[field]
     
     # Add contextual fields if present
     for field in config.contextual_fields:
