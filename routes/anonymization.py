@@ -69,10 +69,68 @@ anonymizer_engine: Optional[AnonymizerEngine] = None
 # Replacement mappings for consistent anonymization
 replacement_mappings: Dict[str, Dict[str, str]] = {}
 
+# Entity type mapping for Isotonic BERT model
+# Maps fine-grained entity types to standard Presidio types
+ENTITY_TYPE_MAPPING = {
+    "FIRSTNAME": "PERSON",
+    "LASTNAME": "PERSON",
+    "MIDDLENAME": "PERSON",
+    "PREFIX": "PERSON",  # Dr., Mr., etc.
+    "USERNAME": "PERSON",
+    "DOB": "DATE_TIME",
+    "DATE": "DATE_TIME",
+    "TIME": "DATE_TIME",
+    "AGE": "DATE_TIME",
+    "PHONENUMBER": "PHONE_NUMBER",
+    "CITY": "LOCATION",
+    "STATE": "LOCATION",
+    "COUNTY": "LOCATION",
+    "STREET": "LOCATION",
+    "ZIPCODE": "LOCATION",
+    "BUILDINGNAME": "LOCATION",
+    "SECONDARYADDRESS": "LOCATION",
+    "SSN": "US_SSN",
+    "IDCARDNUMBER": "US_SSN",  # Often used for SSN
+    "ACCOUNTNUMBER": "US_BANK_NUMBER",
+    "PIN": "US_BANK_NUMBER",
+    "CREDITCARDNUMBER": "CREDIT_CARD",
+    "EMAIL": "EMAIL_ADDRESS",
+    "URL": "URL",
+    "IPV4": "IP_ADDRESS",
+    "IPV6": "IP_ADDRESS",
+    "MAC": "IP_ADDRESS",  # MAC addresses
+    "VEHICLEVRM": "LICENSE_PLATE",
+    "VEHICLEVINNUMBER": "LICENSE_PLATE",
+    "DRIVERLICENSE": "US_DRIVER_LICENSE",
+}
+
 
 def get_custom_recognizers() -> List[PatternRecognizer]:
     """Create custom recognizers for forensic document patterns."""
     recognizers = []
+    
+    # Add custom name recognizer for common name patterns
+    name_recognizer = PatternRecognizer(
+        supported_entity="PERSON",
+        patterns=[
+            Pattern(
+                name="full_name",
+                regex=r"\b([A-Z][a-z]+\s+){1,3}[A-Z][a-z]+\b",  # John Smith, John A. Smith
+                score=0.85
+            ),
+            Pattern(
+                name="name_with_title",
+                regex=r"\b(Mr\.|Mrs\.|Ms\.|Dr\.|Prof\.)\s+[A-Z][a-z]+(\s+[A-Z]\.?\s+)?[A-Z][a-z]+\b",
+                score=0.9
+            ),
+            Pattern(
+                name="all_caps_name",
+                regex=r"\b[A-Z]{2,}(\s+[A-Z]{2,})+\b",  # JOHN SMITH
+                score=0.8
+            )
+        ]
+    )
+    recognizers.append(name_recognizer)
     
     # Bates number recognizer
     bates_recognizer = PatternRecognizer(
@@ -150,6 +208,7 @@ def initialize_engines(use_bert: bool = True) -> tuple[AnalyzerEngine, Anonymize
                     "models": [{
                         "lang_code": "en",
                         "model_name": {
+                            "spacy": "en_core_web_md",  # For tokenization only
                             "transformers": "Isotonic/distilbert_finetuned_ai4privacy_v2",
                             "model_kwargs": {
                                 "max_length": 512,  # Handle longer texts
@@ -174,9 +233,19 @@ def initialize_engines(use_bert: bool = True) -> tuple[AnalyzerEngine, Anonymize
                 logger.info("✅ Privacy-focused BERT model loaded successfully")
                 
             else:
-                # Basic analyzer without BERT
+                # Pattern-based analyzer without NLP
                 logger.info("Using pattern-based recognition only")
-                analyzer_engine = AnalyzerEngine()
+                # Create analyzer with registry only - no NLP
+                from presidio_analyzer import RecognizerRegistry
+                
+                # Create empty registry
+                registry = RecognizerRegistry()
+                registry.load_predefined_recognizers(["en"])
+                
+                analyzer_engine = AnalyzerEngine(
+                    registry=registry,
+                    supported_languages=["en"]
+                )
             
             # Add custom recognizers for forensic patterns
             for recognizer in get_custom_recognizers():
@@ -252,19 +321,49 @@ def anonymize_text_field(text: str, analyzer: AnalyzerEngine,
                         anonymizer: AnonymizerEngine, 
                         entity_types: List[str],
                         use_consistent: bool = True,
-                        date_shift_days: int = 365) -> tuple[str, Dict[str, int]]:
+                        date_shift_days: int = 365,
+                        use_bert: bool = True) -> tuple[str, Dict[str, int]]:
     """Anonymize a text field and return statistics."""
     if not text or not isinstance(text, str):
         return text, {}
     
-    # Analyze the text
+    # Analyze the text with requested entity types
     results = analyzer.analyze(text=text, language="en", entities=entity_types)
+    
+    # For BERT mode, also check for fine-grained types and map them
+    if use_bert and "PERSON" in entity_types:
+        # Get all results to check for name-related entities
+        all_results = analyzer.analyze(text=text, language="en", entities=None)
+        
+        # Find and add name-related entities
+        person_types = {k for k, v in ENTITY_TYPE_MAPPING.items() if v == "PERSON"}
+        for result in all_results:
+            if result.entity_type in person_types:
+                # Map to PERSON and add if not overlapping
+                mapped_result = RecognizerResult(
+                    entity_type="PERSON",
+                    start=result.start,
+                    end=result.end,
+                    score=result.score
+                )
+                # Check for overlap with existing results
+                overlap = False
+                for existing in results:
+                    if (mapped_result.start < existing.end and 
+                        mapped_result.end > existing.start):
+                        overlap = True
+                        break
+                if not overlap:
+                    results.append(mapped_result)
+    
+    # Use results directly
+    filtered_results = results
     
     # Create operators for anonymization
     operators = {}
     stats = {}
     
-    for result in results:
+    for result in filtered_results:
         entity_type = result.entity_type
         original_text = text[result.start:result.end]
         
@@ -285,7 +384,7 @@ def anonymize_text_field(text: str, analyzer: AnalyzerEngine,
     # Anonymize the text
     anonymized_result = anonymizer.anonymize(
         text=text,
-        analyzer_results=results,
+        analyzer_results=filtered_results,
         operators=operators
     )
     
@@ -316,7 +415,8 @@ def anonymize_azure_di_json(data: Dict[str, Any],
                 value, analyzer, anonymizer,
                 config.entity_types,
                 config.consistent_replacements,
-                config.date_shift_days
+                config.date_shift_days,
+                config.use_bert_ner
             )
             anonymized[key] = anonymized_text
             
@@ -342,7 +442,8 @@ def anonymize_azure_di_json(data: Dict[str, Any],
                         item, analyzer, anonymizer,
                         config.entity_types,
                         config.consistent_replacements,
-                        config.date_shift_days
+                        config.date_shift_days,
+                        config.use_bert_ner
                     )
                     anonymized_list.append(anon_text)
                     for entity_type, count in stats.items():
@@ -380,8 +481,8 @@ async def anonymize_azure_di_endpoint(request: AnonymizationRequest):
     5. Provides consistent replacements for the same values
     """
     try:
-        # Initialize engines
-        analyzer, anonymizer = initialize_engines(use_bert=request.config.use_bert_ner)
+        # Initialize engines (always use BERT for now)
+        analyzer, anonymizer = initialize_engines(use_bert=True)
         
         # Clear mappings for new anonymization session
         global replacement_mappings
@@ -414,12 +515,14 @@ async def anonymize_azure_di_endpoint(request: AnonymizationRequest):
 async def health_check():
     """Check if anonymization service is ready."""
     try:
-        # Try to initialize engines
-        analyzer, anonymizer = initialize_engines(use_bert=False)
+        # Only test BERT since pattern-only isn't working without spaCy
+        analyzer, anonymizer = initialize_engines(use_bert=True)
+        
         return {
             "status": "healthy",
             "service": "anonymization",
-            "engines_initialized": analyzer is not None and anonymizer is not None
+            "bert_engine": analyzer is not None and anonymizer is not None,
+            "model": "Isotonic/distilbert_finetuned_ai4privacy_v2"
         }
     except Exception as e:
         return {

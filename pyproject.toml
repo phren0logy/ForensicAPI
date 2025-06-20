@@ -24,6 +24,8 @@ dependencies = [
     "torch>=2.1.0",
     "faker>=20.1.0",
     "spacy>=3.7.0",
+    "spacy-huggingface-pipelines>=0.0.4",
+    "pip>=25.1.1",
 ]
 
 [dependency-groups]
