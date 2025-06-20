@@ -1,0 +1,197 @@
+{
+  "status": "succeeded",
+  "createdDateTime": "2024-01-15T10:30:00Z",
+  "content": "MEDICAL RECORD\n\nPatient: Sarah Johnson\nMRN: 98765432\nDate of Birth: 03/15/1980\nPhone: (555) 234-5678\nAddress: 123 Medical Center Dr, Boston, MA 02115\n\nVISIT SUMMARY - January 15, 2024\nProvider: Dr. Michael Chen, MD License: MD123456\nChief Complaint: Annual physical examination\n\nVISIT SUMMARY - February 20, 2024  \nProvider: Dr. Emily Rodriguez, MD License: MD789012\nChief Complaint: Follow-up visit\n\nPatient SSN: 123-45-6789\nInsurance ID: ABC123456789",
+  "pages": [
+    {
+      "pageNumber": 1,
+      "angle": 0,
+      "width": 8.5,
+      "height": 11,
+      "unit": "inch",
+      "words": [
+        {
+          "content": "Sarah",
+          "boundingBox": [
+            100,
+            200,
+            150,
+            220
+          ],
+          "confidence": 0.99
+        },
+        {
+          "content": "Johnson",
+          "boundingBox": [
+            160,
+            200,
+            210,
+            220
+          ],
+          "confidence": 0.99
+        },
+        {
+          "content": "98765432",
+          "boundingBox": [
+            100,
+            240,
+            180,
+            260
+          ],
+          "confidence": 0.98
+        }
+      ],
+      "lines": [
+        {
+          "content": "Patient: Sarah Johnson",
+          "boundingBox": [
+            100,
+            200,
+            300,
+            220
+          ]
+        },
+        {
+          "content": "MRN: 98765432",
+          "boundingBox": [
+            100,
+            240,
+            300,
+            260
+          ]
+        },
+        {
+          "content": "SSN: 123-45-6789",
+          "boundingBox": [
+            100,
+            280,
+            300,
+            300
+          ]
+        }
+      ]
+    },
+    {
+      "pageNumber": 2,
+      "angle": 0,
+      "width": 8.5,
+      "height": 11,
+      "unit": "inch",
+      "lines": [
+        {
+          "content": "Provider: Dr. Emily Rodriguez",
+          "boundingBox": [
+            100,
+            100,
+            400,
+            120
+          ]
+        },
+        {
+          "content": "MD License: MD789012",
+          "boundingBox": [
+            100,
+            140,
+            350,
+            160
+          ]
+        }
+      ]
+    }
+  ],
+  "tables": [
+    {
+      "rowCount": 4,
+      "columnCount": 3,
+      "cells": [
+        {
+          "rowIndex": 0,
+          "columnIndex": 0,
+          "content": "Visit Date",
+          "kind": "columnHeader"
+        },
+        {
+          "rowIndex": 0,
+          "columnIndex": 1,
+          "content": "Provider",
+          "kind": "columnHeader"
+        },
+        {
+          "rowIndex": 0,
+          "columnIndex": 2,
+          "content": "Diagnosis",
+          "kind": "columnHeader"
+        },
+        {
+          "rowIndex": 1,
+          "columnIndex": 0,
+          "content": "01/15/2024"
+        },
+        {
+          "rowIndex": 1,
+          "columnIndex": 1,
+          "content": "Dr. Michael Chen"
+        },
+        {
+          "rowIndex": 1,
+          "columnIndex": 2,
+          "content": "Annual Physical"
+        },
+        {
+          "rowIndex": 2,
+          "columnIndex": 0,
+          "content": "02/20/2024"
+        },
+        {
+          "rowIndex": 2,
+          "columnIndex": 1,
+          "content": "Dr. Emily Rodriguez"
+        },
+        {
+          "rowIndex": 2,
+          "columnIndex": 2,
+          "content": "Follow-up"
+        }
+      ]
+    }
+  ],
+  "keyValuePairs": [
+    {
+      "key": {
+        "content": "Patient Name"
+      },
+      "value": {
+        "content": "Sarah Johnson"
+      }
+    },
+    {
+      "key": {
+        "content": "MRN"
+      },
+      "value": {
+        "content": "98765432"
+      }
+    },
+    {
+      "key": {
+        "content": "Phone"
+      },
+      "value": {
+        "content": "(555) 234-5678"
+      }
+    },
+    {
+      "key": {
+        "content": "Email"
+      },
+      "value": {
+        "content": "sarah.johnson@email.com"
+      }
+    }
+  ],
+  "analyzeResult": {
+    "apiVersion": "2023-07-31",
+    "modelId": "prebuilt-layout",
+    "stringIndexType": "textElements"
+  }
+}

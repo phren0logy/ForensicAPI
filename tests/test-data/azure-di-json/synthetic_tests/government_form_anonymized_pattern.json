@@ -1,0 +1,163 @@
+{
+  "status": "succeeded",
+  "createdDateTime": "[DATE_SHIFTED_-127d]",
+  "content": "DEPARTMENT OF SOCIAL SERVICES\n7093-CR-34221 FORM\n\n7093-CR-34221: DSS-2024-78901\nDate: [DATE_SHIFTED_-310d]\n\nClient Information:\nName: Maria Garcia\nDOB: 7093-CR-34221\nSSN: 576-81-2857\nPhone: 350-875-0860x02924\nAddress: 321 Oak Street, Apt 4B, San Diego, CA 92101\nEmail: zoconnor@example.com\n\n7093-CR-34221: James Wilson\nEmployee ID: EMP-45678\nDepartment: Family Services\n\nEmergency Contact:\nName: Carlos Garcia\nRelationship: Spouse\nPhone: 350-875-0860x02924\n\nServices Requested:\n[X] Food Assistance\n[X] Housing Support\n[ ] Medical Services\n[X] Child Care\n\nFORM ID: DSS-FORM-2024-001",
+  "pages": [
+    {
+      "pageNumber": 1,
+      "angle": 0,
+      "width": 8.5,
+      "height": 11,
+      "unit": "inch",
+      "selectionMarks": [
+        {
+          "state": "selected",
+          "boundingBox": [
+            50,
+            600,
+            70,
+            620
+          ],
+          "confidence": 0.99
+        },
+        {
+          "state": "selected",
+          "boundingBox": [
+            50,
+            630,
+            70,
+            650
+          ],
+          "confidence": 0.99
+        },
+        {
+          "state": "unselected",
+          "boundingBox": [
+            50,
+            660,
+            70,
+            680
+          ],
+          "confidence": 0.99
+        },
+        {
+          "state": "selected",
+          "boundingBox": [
+            50,
+            690,
+            70,
+            710
+          ],
+          "confidence": 0.99
+        }
+      ]
+    }
+  ],
+  "tables": [
+    {
+      "rowCount": 5,
+      "columnCount": 2,
+      "cells": [
+        {
+          "rowIndex": 0,
+          "columnIndex": 0,
+          "content": "Field",
+          "kind": "columnHeader"
+        },
+        {
+          "rowIndex": 0,
+          "columnIndex": 1,
+          "content": "Value",
+          "kind": "columnHeader"
+        },
+        {
+          "rowIndex": 1,
+          "columnIndex": 0,
+          "content": "Client Name"
+        },
+        {
+          "rowIndex": 1,
+          "columnIndex": 1,
+          "content": "Maria Garcia"
+        },
+        {
+          "rowIndex": 2,
+          "columnIndex": 0,
+          "content": "4427-CR-74187"
+        },
+        {
+          "rowIndex": 2,
+          "columnIndex": 1,
+          "content": "DSS-2024-78901"
+        },
+        {
+          "rowIndex": 3,
+          "columnIndex": 0,
+          "content": "7147-CR-21192"
+        },
+        {
+          "rowIndex": 3,
+          "columnIndex": 1,
+          "content": "James Wilson"
+        },
+        {
+          "rowIndex": 4,
+          "columnIndex": 0,
+          "content": "Department"
+        },
+        {
+          "rowIndex": 4,
+          "columnIndex": 1,
+          "content": "Family Services"
+        }
+      ]
+    }
+  ],
+  "keyValuePairs": [
+    {
+      "key": {
+        "content": "4427-CR-74187"
+      },
+      "value": {
+        "content": "DSS-2024-78901"
+      }
+    },
+    {
+      "key": {
+        "content": "Client Name"
+      },
+      "value": {
+        "content": "Maria Garcia"
+      }
+    },
+    {
+      "key": {
+        "content": "SSN"
+      },
+      "value": {
+        "content": "7093-CR-34221"
+      }
+    },
+    {
+      "key": {
+        "content": "7147-CR-21192"
+      },
+      "value": {
+        "content": "James Wilson"
+      }
+    },
+    {
+      "key": {
+        "content": "Employee ID"
+      },
+      "value": {
+        "content": "EMP-45678"
+      }
+    }
+  ],
+  "analyzeResult": {
+    "apiVersion": "[DATE_SHIFTED_-302d]",
+    "modelId": "prebuilt-layout",
+    "stringIndexType": "textElements"
+  }
+}

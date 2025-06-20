@@ -1,0 +1,139 @@
+{
+  "status": "succeeded",
+  "createdDateTime": "[DATE_SHIFTED_54d]",
+  "content": "UNITED STATES DISTRICT COURT\nSOUTHERN DISTRICT OF NEW YORK\n\n8108-CR-21620: 8108-CR-21620\n\nUNITED STATES OF AMERICA,\n    Plaintiff,\nv.\nROBERT WILLIAMS,\n    Defendant.\n\nMOTION FOR SUMMARY JUDGMENT\n\nAttorney: Jennifer Martinez, Esq.\nBar Number: ANON-381982\nAddress: 456 Court Street, New York, NY 10013\nPhone: 433-322-4281x80207\nEmail: smithtravis@example.net\n\nDefendant Information:\nName: Robert Williams\nDOB: 8108-CR-21620\nSSN: 8108-CR-21620\nAddress: 789 Liberty Ave, Brooklyn, NY 11208\n\nANON-381982\n\nFiled: March 10, 2024\nJudge: Hon. David Thompson",
+  "pages": [
+    {
+      "pageNumber": 1,
+      "angle": 0,
+      "width": 8.5,
+      "height": 11,
+      "unit": "inch",
+      "words": [
+        {
+          "content": "1955-CR-72949",
+          "boundingBox": [
+            200,
+            150,
+            350,
+            170
+          ],
+          "confidence": 0.99
+        },
+        {
+          "content": "ANON-441270",
+          "boundingBox": [
+            100,
+            800,
+            250,
+            820
+          ],
+          "confidence": 0.99
+        }
+      ],
+      "lines": [
+        {
+          "content": "1955-CR-72949: 1955-CR-72949",
+          "boundingBox": [
+            100,
+            150,
+            350,
+            170
+          ]
+        },
+        {
+          "content": "ROBERT WILLIAMS",
+          "boundingBox": [
+            100,
+            250,
+            300,
+            270
+          ]
+        },
+        {
+          "content": "Attorney: Jennifer Martinez, Esq.",
+          "boundingBox": [
+            100,
+            400,
+            400,
+            420
+          ]
+        },
+        {
+          "content": "ANON-441270",
+          "boundingBox": [
+            100,
+            800,
+            250,
+            820
+          ]
+        }
+      ]
+    },
+    {
+      "pageNumber": 2,
+      "angle": 0,
+      "width": 8.5,
+      "height": 11,
+      "unit": "inch",
+      "lines": [
+        {
+          "content": "ANON-277116",
+          "boundingBox": [
+            100,
+            800,
+            250,
+            820
+          ]
+        }
+      ]
+    }
+  ],
+  "keyValuePairs": [
+    {
+      "key": {
+        "content": "9008-CR-26423"
+      },
+      "value": {
+        "content": "1955-CR-72949"
+      }
+    },
+    {
+      "key": {
+        "content": "Defendant"
+      },
+      "value": {
+        "content": "Robert Williams"
+      }
+    },
+    {
+      "key": {
+        "content": "Attorney"
+      },
+      "value": {
+        "content": "Jennifer Martinez"
+      }
+    },
+    {
+      "key": {
+        "content": "Bar Number"
+      },
+      "value": {
+        "content": "ANON-381982"
+      }
+    },
+    {
+      "key": {
+        "content": "Filed"
+      },
+      "value": {
+        "content": "[DATE_SHIFTED_160d]"
+      }
+    }
+  ],
+  "analyzeResult": {
+    "apiVersion": "[DATE_SHIFTED_-77d]",
+    "modelId": "prebuilt-layout",
+    "stringIndexType": "textElements"
+  }
+}

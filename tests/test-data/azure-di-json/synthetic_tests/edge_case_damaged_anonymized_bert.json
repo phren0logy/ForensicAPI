@@ -1,0 +1,78 @@
+{
+  "status": "succeeded",
+  "createdDateTime": "[DATE_SHIFTED_-105d]",
+  "content": "[PARTIALLY READABLE DOCUMENT]\n\nName: J\u2588\u2588\u2588\u2588\u2588 Sm\u2588\u2588\u2588\nID: \u2588\u2588\u2588-\u2588\u2588-4567\nDate: \u2588\u2588/[DATE_SHIFTED_321d]\n\nContact Information:\nPhone: (5\u2588\u2588) \u2588\u2588\u2588-\u2588\u2588\u2588\u2588\nEmail: j\u2588\u2588\u2588\u2588@\u2588\u2588\u2588\u2588.com\n\nNotes: Document partially damaged by water.\nSome information may be missing or illegible.\n\nReference: DAMAGED-DOC-2024-001",
+  "pages": [
+    {
+      "pageNumber": 1,
+      "angle": 0,
+      "width": 8.5,
+      "height": 11,
+      "unit": "inch",
+      "words": [
+        {
+          "content": "J",
+          "boundingBox": [
+            100,
+            200,
+            110,
+            220
+          ],
+          "confidence": 0.65
+        },
+        {
+          "content": "Sm",
+          "boundingBox": [
+            200,
+            200,
+            220,
+            220
+          ],
+          "confidence": 0.7
+        }
+      ],
+      "lines": [
+        {
+          "content": "Name: J\u2588\u2588\u2588\u2588\u2588 Sm\u2588\u2588\u2588",
+          "boundingBox": [
+            100,
+            200,
+            300,
+            220
+          ]
+        },
+        {
+          "content": "ID: \u2588\u2588\u2588-\u2588\u2588-4567",
+          "boundingBox": [
+            100,
+            240,
+            300,
+            260
+          ]
+        }
+      ]
+    }
+  ],
+  "tables": [],
+  "keyValuePairs": [
+    {
+      "key": {
+        "content": "Reference"
+      },
+      "value": {
+        "content": "DAMAGED-DOC-2024-001"
+      }
+    }
+  ],
+  "analyzeResult": {
+    "apiVersion": "[DATE_SHIFTED_177d]",
+    "modelId": "prebuilt-layout",
+    "stringIndexType": "textElements",
+    "warnings": [
+      {
+        "code": "PARTIAL_TEXT",
+        "message": "Some text may be illegible due to document quality"
+      }
+    ]
+  }
+}

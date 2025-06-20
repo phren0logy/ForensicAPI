@@ -107,3 +107,5 @@ db.sqlite3
 # Anonymized test data and results
 tests/test_data/anonymized/
 tests/test_results/anonymized/
+tests/test-data/azure-di-json/anonymized/
+test_results/

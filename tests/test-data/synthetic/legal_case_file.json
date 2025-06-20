@@ -1,0 +1,139 @@
+{
+  "status": "succeeded",
+  "createdDateTime": "2024-03-10T14:20:00Z",
+  "content": "UNITED STATES DISTRICT COURT\nSOUTHERN DISTRICT OF NEW YORK\n\nCase No: 2024-CR-54321\n\nUNITED STATES OF AMERICA,\n    Plaintiff,\nv.\nROBERT WILLIAMS,\n    Defendant.\n\nMOTION FOR SUMMARY JUDGMENT\n\nAttorney: Jennifer Martinez, Esq.\nBar Number: NY-987654\nAddress: 456 Court Street, New York, NY 10013\nPhone: (212) 555-9876\nEmail: jmartinez@lawfirm.com\n\nDefendant Information:\nName: Robert Williams\nDOB: 07/22/1975\nSSN: 987-65-4321\nAddress: 789 Liberty Ave, Brooklyn, NY 11208\n\nBATES-001234\n\nFiled: March 10, 2024\nJudge: Hon. David Thompson",
+  "pages": [
+    {
+      "pageNumber": 1,
+      "angle": 0,
+      "width": 8.5,
+      "height": 11,
+      "unit": "inch",
+      "words": [
+        {
+          "content": "2024-CR-54321",
+          "boundingBox": [
+            200,
+            150,
+            350,
+            170
+          ],
+          "confidence": 0.99
+        },
+        {
+          "content": "BATES-001234",
+          "boundingBox": [
+            100,
+            800,
+            250,
+            820
+          ],
+          "confidence": 0.99
+        }
+      ],
+      "lines": [
+        {
+          "content": "Case No: 2024-CR-54321",
+          "boundingBox": [
+            100,
+            150,
+            350,
+            170
+          ]
+        },
+        {
+          "content": "ROBERT WILLIAMS",
+          "boundingBox": [
+            100,
+            250,
+            300,
+            270
+          ]
+        },
+        {
+          "content": "Attorney: Jennifer Martinez, Esq.",
+          "boundingBox": [
+            100,
+            400,
+            400,
+            420
+          ]
+        },
+        {
+          "content": "BATES-001234",
+          "boundingBox": [
+            100,
+            800,
+            250,
+            820
+          ]
+        }
+      ]
+    },
+    {
+      "pageNumber": 2,
+      "angle": 0,
+      "width": 8.5,
+      "height": 11,
+      "unit": "inch",
+      "lines": [
+        {
+          "content": "BATES-001235",
+          "boundingBox": [
+            100,
+            800,
+            250,
+            820
+          ]
+        }
+      ]
+    }
+  ],
+  "keyValuePairs": [
+    {
+      "key": {
+        "content": "Case No"
+      },
+      "value": {
+        "content": "2024-CR-54321"
+      }
+    },
+    {
+      "key": {
+        "content": "Defendant"
+      },
+      "value": {
+        "content": "Robert Williams"
+      }
+    },
+    {
+      "key": {
+        "content": "Attorney"
+      },
+      "value": {
+        "content": "Jennifer Martinez"
+      }
+    },
+    {
+      "key": {
+        "content": "Bar Number"
+      },
+      "value": {
+        "content": "NY-987654"
+      }
+    },
+    {
+      "key": {
+        "content": "Filed"
+      },
+      "value": {
+        "content": "March 10, 2024"
+      }
+    }
+  ],
+  "analyzeResult": {
+    "apiVersion": "2023-07-31",
+    "modelId": "prebuilt-layout",
+    "stringIndexType": "textElements"
+  }
+}

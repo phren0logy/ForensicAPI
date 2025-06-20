@@ -38,12 +38,11 @@ class TestRealDataSegmentation:
     @pytest.fixture
     def test_data_dir(self):
         """Get test data directory paths."""
-        # Access test data from main repo using relative paths
-        backend_tests_dir = Path(__file__).parent
-        main_repo_dir = backend_tests_dir.parent.parent  # Go up to forensic-desktop
+        # Test data is now in backend/tests/test-data
+        current_dir = Path(__file__).parent
         return {
-            "synthetic": main_repo_dir / "test-data" / "synthetic",
-            "anonymized": main_repo_dir / "test-data" / "azure-di-json" / "anonymized"
+            "synthetic": current_dir / "test-data" / "synthetic",
+            "anonymized": current_dir / "test-data" / "azure-di-json" / "anonymized"
         }
     
     @pytest.fixture

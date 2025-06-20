@@ -37,7 +37,15 @@ class FilteredElement(BaseModel):
     columnIndex: Optional[int] = None
     columnHeader: Optional[str] = None
     
-    model_config = {"populate_by_name": True}
+    model_config = {
+        "populate_by_name": True,
+        "extra": "forbid"  # Don't allow extra fields
+    }
+    
+    def model_dump(self, **kwargs):
+        """Override to exclude None values by default."""
+        kwargs.setdefault('exclude_none', True)
+        return super().model_dump(**kwargs)
 
 class ElementMapping(BaseModel):
     """Mapping between filtered and original elements."""
@@ -143,18 +151,21 @@ def filter_element(
                 filtered_data[field] = value
     else:
         for field in config.essential_fields:
-            if field in element:
+            if field in element and not should_exclude_field(field, config.excluded_patterns):
                 filtered_data[field] = element[field]
     
     # Add contextual fields if present
     for field in config.contextual_fields:
-        if field in element:
+        if field in element and not should_exclude_field(field, config.excluded_patterns):
             filtered_data[field] = element[field]
     
-    # Special handling for common fields
-    filtered_data["content"] = content
-    filtered_data["pageNumber"] = element.get("pageNumber", element.get("page_number"))
-    filtered_data["elementType"] = element.get("role", element.get("type", "paragraph"))
+    # Special handling for common fields (only if not already added and not excluded)
+    if "content" not in filtered_data and not should_exclude_field("content", config.excluded_patterns):
+        filtered_data["content"] = content
+    if "pageNumber" not in filtered_data and not should_exclude_field("pageNumber", config.excluded_patterns):
+        filtered_data["pageNumber"] = element.get("pageNumber", element.get("page_number"))
+    if "elementType" not in filtered_data and not should_exclude_field("elementType", config.excluded_patterns):
+        filtered_data["elementType"] = element.get("role", element.get("type", "paragraph"))
     
     # Add parent section if available and requested
     if "parentSection" in config.contextual_fields and parent_section:
@@ -164,17 +175,23 @@ def filter_element(
     if "elementIndex" in config.contextual_fields:
         filtered_data["elementIndex"] = index
     
-    # Handle table-specific fields
+    # Handle table-specific fields (only if not excluded)
     if element.get("role") == "table" or element.get("type") == "table":
-        if "rowIndex" in element:
+        if "rowIndex" in element and not should_exclude_field("rowIndex", config.excluded_patterns):
             filtered_data["rowIndex"] = element["rowIndex"]
-        if "columnIndex" in element:
+        if "columnIndex" in element and not should_exclude_field("columnIndex", config.excluded_patterns):
             filtered_data["columnIndex"] = element["columnIndex"]
-        if "columnHeader" in element:
+        if "columnHeader" in element and not should_exclude_field("columnHeader", config.excluded_patterns):
             filtered_data["columnHeader"] = element["columnHeader"]
     
     try:
-        filtered_element = FilteredElement(**filtered_data)
+        # Create FilteredElement with only the fields that were actually added
+        # This prevents Pydantic from adding None values for optional fields
+        filtered_element = FilteredElement.model_validate(filtered_data)
+        # Remove any None values that Pydantic might have added
+        element_dict = filtered_element.model_dump(exclude_none=True)
+        # Recreate with only non-None values
+        filtered_element = FilteredElement(**element_dict)
         return filtered_element, element_id
     except Exception as e:
         logger.error(f"Error creating filtered element: {e}")
@@ -224,11 +241,13 @@ def apply_filters(
     # Apply preset if specified
     if config.filter_preset in FILTER_PRESETS:
         preset = FILTER_PRESETS[config.filter_preset]
-        # Update config with preset values (keeping any custom overrides)
-        if not config.essential_fields:
+        # For non-custom presets, always use the preset values
+        if config.filter_preset != "custom":
             config.essential_fields = preset["essential_fields"]
-        if not config.excluded_patterns:
             config.excluded_patterns = preset["excluded_patterns"]
+            # Add contextual fields if specified in preset
+            if "contextual_fields" in preset:
+                config.contextual_fields = preset["contextual_fields"]
     
     # Calculate original size
     original_json = json.dumps(analysis_result)

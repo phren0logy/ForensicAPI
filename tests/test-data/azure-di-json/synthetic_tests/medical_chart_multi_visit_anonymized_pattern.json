@@ -1,0 +1,197 @@
+{
+  "status": "succeeded",
+  "createdDateTime": "[DATE_SHIFTED_111d]",
+  "content": "MEDICAL RECORD\n\nPatient: Sarah Johnson\nMRN61807672\nDate of Birth: [DATE_SHIFTED_293d]\nPhone: 859.242.8804\nAddress: 123 Medical Center Dr, Boston, MA 02115\n\nVISIT SUMMARY - January 15[DATE_SHIFTED_293d]\nProvider: Dr. Michael Chen, MD License: ANON-204539\nChief Complaint: Annual physical examination\n\nVISIT SUMMARY - [DATE_SHIFTED_293d]  \nProvider: Dr. Emily Rodriguez, MD License: ANON-204539\nChief Complaint: Follow-up visit\n\nPatient SSN: 2212-CR-69594\nInsurance ID: ABC123456789",
+  "pages": [
+    {
+      "pageNumber": 1,
+      "angle": 0,
+      "width": 8.5,
+      "height": 11,
+      "unit": "inch",
+      "words": [
+        {
+          "content": "Sarah",
+          "boundingBox": [
+            100,
+            200,
+            150,
+            220
+          ],
+          "confidence": 0.99
+        },
+        {
+          "content": "Johnson",
+          "boundingBox": [
+            160,
+            200,
+            210,
+            220
+          ],
+          "confidence": 0.99
+        },
+        {
+          "content": "98765432",
+          "boundingBox": [
+            100,
+            240,
+            180,
+            260
+          ],
+          "confidence": 0.98
+        }
+      ],
+      "lines": [
+        {
+          "content": "Patient: Sarah Johnson",
+          "boundingBox": [
+            100,
+            200,
+            300,
+            220
+          ]
+        },
+        {
+          "content": "MRN61807672",
+          "boundingBox": [
+            100,
+            240,
+            300,
+            260
+          ]
+        },
+        {
+          "content": "SSN: 2212-CR-69594",
+          "boundingBox": [
+            100,
+            280,
+            300,
+            300
+          ]
+        }
+      ]
+    },
+    {
+      "pageNumber": 2,
+      "angle": 0,
+      "width": 8.5,
+      "height": 11,
+      "unit": "inch",
+      "lines": [
+        {
+          "content": "Provider: Dr. Emily Rodriguez",
+          "boundingBox": [
+            100,
+            100,
+            400,
+            120
+          ]
+        },
+        {
+          "content": "MD License: ANON-204539",
+          "boundingBox": [
+            100,
+            140,
+            350,
+            160
+          ]
+        }
+      ]
+    }
+  ],
+  "tables": [
+    {
+      "rowCount": 4,
+      "columnCount": 3,
+      "cells": [
+        {
+          "rowIndex": 0,
+          "columnIndex": 0,
+          "content": "Visit Date",
+          "kind": "columnHeader"
+        },
+        {
+          "rowIndex": 0,
+          "columnIndex": 1,
+          "content": "Provider",
+          "kind": "columnHeader"
+        },
+        {
+          "rowIndex": 0,
+          "columnIndex": 2,
+          "content": "Diagnosis",
+          "kind": "columnHeader"
+        },
+        {
+          "rowIndex": 1,
+          "columnIndex": 0,
+          "content": "5963-CR-67723"
+        },
+        {
+          "rowIndex": 1,
+          "columnIndex": 1,
+          "content": "Dr. Michael Chen"
+        },
+        {
+          "rowIndex": 1,
+          "columnIndex": 2,
+          "content": "Annual Physical"
+        },
+        {
+          "rowIndex": 2,
+          "columnIndex": 0,
+          "content": "8780-CR-75241"
+        },
+        {
+          "rowIndex": 2,
+          "columnIndex": 1,
+          "content": "Dr. Emily Rodriguez"
+        },
+        {
+          "rowIndex": 2,
+          "columnIndex": 2,
+          "content": "Follow-up"
+        }
+      ]
+    }
+  ],
+  "keyValuePairs": [
+    {
+      "key": {
+        "content": "Patient Name"
+      },
+      "value": {
+        "content": "Sarah Johnson"
+      }
+    },
+    {
+      "key": {
+        "content": "MRN"
+      },
+      "value": {
+        "content": "98765432"
+      }
+    },
+    {
+      "key": {
+        "content": "Phone"
+      },
+      "value": {
+        "content": "859.242.8804"
+      }
+    },
+    {
+      "key": {
+        "content": "Email"
+      },
+      "value": {
+        "content": "sotocarlos@example.com"
+      }
+    }
+  ],
+  "analyzeResult": {
+    "apiVersion": "[DATE_SHIFTED_197d]",
+    "modelId": "prebuilt-layout",
+    "stringIndexType": "textElements"
+  }
+}
