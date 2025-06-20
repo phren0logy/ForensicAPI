@@ -103,3 +103,7 @@ db.sqlite3
 *.whl
 
 *.sesskey
+
+# Anonymized test data and results
+tests/test_data/anonymized/
+tests/test_results/anonymized/
