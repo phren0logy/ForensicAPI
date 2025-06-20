@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import tiktoken
 from fastapi import APIRouter, Body, HTTPException
@@ -51,7 +51,7 @@ class FilteredSegment(BaseModel):
     source_file: str
     token_count: int
     structural_context: StructuralContext
-    elements: List[FilteredElement] = Field(default_factory=list)
+    elements: List[Union[FilteredElement, Dict[str, Any]]] = Field(default_factory=list)
 
 class FilteredSegmentationResponse(BaseModel):
     segments: List[FilteredSegment]
@@ -244,7 +244,7 @@ def create_rich_segments(
     return segments
 
 def create_filtered_segments(
-    filtered_elements: List[FilteredElement],
+    filtered_elements: List[Union[FilteredElement, Dict[str, Any]]],
     source_file: str,
     min_segment_tokens: int = 10000,
     max_segment_tokens: int = 30000
@@ -262,15 +262,23 @@ def create_filtered_segments(
     current_context = StructuralContext()
 
     for element in filtered_elements:
+        # Get fields from element (handle both dict and object)
+        if isinstance(element, dict):
+            role = element.get("role")
+            content = element.get("content", "")
+        else:
+            role = element.role
+            content = element.content
+        
         # Update structural context for headings
-        if element.role:
-            level = get_heading_level(element.role)
+        if role:
+            level = get_heading_level(role)
             if level:
-                new_context = update_context(current_context, element.role, element.content)
+                new_context = update_context(current_context, role, content)
                 current_context = new_context
 
         # Calculate tokens for this element
-        element_tokens = len(encoding.encode(element.content))
+        element_tokens = len(encoding.encode(content))
 
         # Decision: Should we start a new segment?
         should_segment = False
@@ -282,10 +290,10 @@ def create_filtered_segments(
         
         # Check if we hit a major structural boundary (H1 or H2) with enough content
         elif buffer_token_count >= min_segment_tokens:
-            level = get_heading_level(element.role or "")
+            level = get_heading_level(role or "")
             if level and level <= 2:
                 should_segment = True
-                logger.debug(f"Segmenting at {element.role} boundary with {buffer_token_count} tokens")
+                logger.debug(f"Segmenting at {role} boundary with {buffer_token_count} tokens")
 
         # Create segment if needed
         if should_segment and buffer_elements:
@@ -478,7 +486,15 @@ async def segment_with_filtering(payload: FilteredSegmentationInput = Body(...))
         # This allows frontend to know which elements are in each segment
         segment_mappings = []
         for segment in filtered_segments:
-            segment_element_ids = {elem.id for elem in segment.elements if elem.id}
+            segment_element_ids = set()
+            for elem in segment.elements:
+                if isinstance(elem, dict):
+                    elem_id = elem.get("_id")
+                else:
+                    elem_id = elem.id
+                if elem_id:
+                    segment_element_ids.add(elem_id)
+            
             segment_maps = [
                 mapping for mapping in element_mappings 
                 if mapping.azure_element_id in segment_element_ids

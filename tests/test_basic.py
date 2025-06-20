@@ -31,17 +31,11 @@ def test_compose_prompt_file_upload():
     assert "File section contents" in resp.text
     assert "<instructions>" in resp.text
 
-def test_pdf_to_markdown_missing_file():
-    resp = client.post("/pdf-to-markdown")
+def test_extract_missing_file():
+    resp = client.post("/extract")
     assert resp.status_code == 422  # Missing file field
 
-def test_pdf_to_markdown_invalid_azure(monkeypatch):
-    # Patch env to simulate missing Azure credentials
-    import os
-    monkeypatch.setenv("AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT", "")
-    monkeypatch.setenv("AZURE_DOCUMENT_INTELLIGENCE_KEY", "")
-    file_content = b"%PDF-1.4 fake pdf"
-    files = {"file": ("test.pdf", io.BytesIO(file_content), "application/pdf")}
-    resp = client.post("/pdf-to-markdown", files=files)
+def test_health_endpoint():
+    resp = client.get("/health")
     assert resp.status_code == 200
-    assert "Azure Document Intelligence endpoint/key not set" in resp.text
+    assert resp.json()["status"] == "healthy"

@@ -19,8 +19,6 @@ from routes.filtering import (
     ElementMapping,
     FilterMetrics,
     FILTER_PRESETS,
-    generate_element_id,
-    should_exclude_field,
     filter_element,
     extract_elements_from_azure_di,
     apply_filters,
@@ -37,45 +35,41 @@ class TestFilterConfig:
     def test_default_filter_config(self):
         """Test default filter configuration values."""
         config = FilterConfig()
-        assert config.filter_preset == "legal_analysis"
-        assert config.essential_fields == ["content", "role", "pageNumber"]
-        assert config.excluded_patterns == ["boundingBox", "spans", "confidence"]
+        assert config.filter_preset == "llm_ready"
+        assert config.fields == ["*"]  # Default allowlist
         assert config.include_element_ids is True
     
     def test_filter_presets(self):
         """Test that all filter presets are properly defined."""
-        assert "legal_analysis" in FILTER_PRESETS
-        assert "content_extraction" in FILTER_PRESETS
-        assert "structured_qa" in FILTER_PRESETS
-        assert "minimal" in FILTER_PRESETS
+        assert "no_filter" in FILTER_PRESETS
+        assert "llm_ready" in FILTER_PRESETS
+        assert "forensic_extraction" in FILTER_PRESETS
+        assert "citation_optimized" in FILTER_PRESETS
         
         # Verify each preset has required fields
         for preset_name, preset_config in FILTER_PRESETS.items():
-            assert "essential_fields" in preset_config
-            assert "contextual_fields" in preset_config
-            assert "excluded_patterns" in preset_config
-            assert isinstance(preset_config["essential_fields"], list)
-            assert isinstance(preset_config["contextual_fields"], list)
-            assert isinstance(preset_config["excluded_patterns"], list)
+            assert "fields" in preset_config
+            assert isinstance(preset_config["fields"], list)
+            
+        # Check specific preset configurations
+        assert "_id" in FILTER_PRESETS["llm_ready"]["fields"]
+        assert "*" in FILTER_PRESETS["no_filter"]["fields"]
     
     def test_custom_filter_config(self):
         """Test custom filter configuration."""
         config = FilterConfig(
             filter_preset="custom",
-            essential_fields=["content", "pageNumber"],
-            contextual_fields=["role"],
-            excluded_patterns=["boundingBox", "confidence"],
+            fields=["content", "pageNumber", "_id"],
             include_element_ids=False
         )
         assert config.filter_preset == "custom"
-        assert config.essential_fields == ["content", "pageNumber"]
-        assert config.contextual_fields == ["role"]
-        assert config.excluded_patterns == ["boundingBox", "confidence"]
+        assert config.fields == ["content", "pageNumber", "_id"]
         assert config.include_element_ids is False
 
 
+@pytest.mark.skip(reason="ID generation moved to extraction phase")
 class TestElementIDGeneration:
-    """Test element ID generation functionality."""
+    """Test element ID generation functionality - moved to extraction phase."""
     
     def test_existing_id_fields(self):
         """Test ID generation when element already has an ID."""
@@ -137,6 +131,7 @@ class TestElementIDGeneration:
         assert id2.startswith("elem_")
 
 
+@pytest.mark.skip(reason="Field exclusion replaced by allowlist approach")
 class TestFieldExclusion:
     """Test field exclusion logic."""
     
@@ -183,6 +178,7 @@ class TestElementFiltering:
     def test_filter_basic_element(self):
         """Test filtering a basic element."""
         element = {
+            "_id": "para_1_0_abc123",  # Element should already have ID from extraction
             "content": "This is a paragraph",
             "role": "paragraph",
             "pageNumber": 1,
@@ -192,14 +188,15 @@ class TestElementFiltering:
         }
         
         config = FilterConfig(
-            essential_fields=["content", "role", "pageNumber"],
-            excluded_patterns=["boundingBox", "spans", "confidence"]
+            filter_preset="custom",
+            fields=["_id", "content", "role", "pageNumber"]
         )
         
         filtered_elem, elem_id = filter_element(element, config, 0)
         
         assert filtered_elem is not None
         assert elem_id is not None
+        assert elem_id == "para_1_0_abc123"  # ID should be preserved from input
         assert filtered_elem.content == "This is a paragraph"
         assert filtered_elem.role == "paragraph"
         assert filtered_elem.pageNumber == 1
@@ -228,6 +225,7 @@ class TestElementFiltering:
     def test_filter_table_element(self):
         """Test filtering table-specific elements."""
         element = {
+            "_id": "table_2_0_def456",
             "content": "Cell content",
             "role": "table",
             "pageNumber": 2,
@@ -237,7 +235,8 @@ class TestElementFiltering:
         }
         
         config = FilterConfig(
-            essential_fields=["content", "role", "pageNumber"]
+            filter_preset="custom",
+            fields=["_id", "content", "role", "pageNumber", "rowIndex", "columnIndex", "columnHeader"]
         )
         
         filtered_elem, elem_id = filter_element(element, config, 0)
@@ -250,14 +249,15 @@ class TestElementFiltering:
     def test_filter_with_parent_section(self):
         """Test filtering with parent section context."""
         element = {
+            "_id": "para_3_5_ghi789",
             "content": "Paragraph under heading",
             "role": "paragraph",
             "pageNumber": 3
         }
         
         config = FilterConfig(
-            essential_fields=["content", "role", "pageNumber"],
-            contextual_fields=["parentSection", "elementIndex"]
+            filter_preset="custom",
+            fields=["_id", "content", "role", "pageNumber", "parentSection", "elementIndex"]
         )
         
         filtered_elem, elem_id = filter_element(
@@ -271,13 +271,15 @@ class TestElementFiltering:
     def test_filter_without_element_ids(self):
         """Test filtering when element IDs are disabled."""
         element = {
+            "_id": "para_1_0_jkl012",
             "content": "Test content",
             "role": "paragraph",
             "pageNumber": 1
         }
         
         config = FilterConfig(
-            essential_fields=["content", "pageNumber"],
+            filter_preset="custom",
+            fields=["content", "pageNumber"],  # Don't include _id
             include_element_ids=False
         )
         
@@ -393,12 +395,14 @@ class TestApplyFilters:
                     "pageNumber": 1,
                     "paragraphs": [
                         {
+                            "_id": "para_1_0_first",
                             "content": "First paragraph",
                             "role": "paragraph",
                             "boundingBox": {"x": 0, "y": 0},
                             "confidence": 0.99
                         },
                         {
+                            "_id": "para_1_1_second",
                             "content": "Second paragraph",
                             "role": "paragraph",
                             "boundingBox": {"x": 0, "y": 50},
@@ -409,7 +413,7 @@ class TestApplyFilters:
             ]
         }
         
-        config = FilterConfig(filter_preset="minimal")
+        config = FilterConfig(filter_preset="citation_optimized")
         filtered_elements, mappings, metrics = apply_filters(azure_di_result, config)
         
         assert len(filtered_elements) == 2
@@ -441,18 +445,22 @@ class TestApplyFilters:
                     "pageNumber": 1,
                     "paragraphs": [
                         {
+                            "_id": "para_1_0_intro",
                             "content": "Introduction",
                             "role": "h1"
                         },
                         {
+                            "_id": "para_1_1_text",
                             "content": "This is the intro",
                             "role": "paragraph"
                         },
                         {
+                            "_id": "para_1_2_bg",
                             "content": "Background",
                             "role": "h2"
                         },
                         {
+                            "_id": "para_1_3_info",
                             "content": "Some background info",
                             "role": "paragraph"
                         }
@@ -462,8 +470,7 @@ class TestApplyFilters:
         }
         
         config = FilterConfig(
-            filter_preset="legal_analysis",
-            contextual_fields=["parentSection"]
+            filter_preset="forensic_extraction"  # This preset includes parentSection
         )
         
         filtered_elements, mappings, metrics = apply_filters(azure_di_result, config)
@@ -481,10 +488,10 @@ class TestApplyFilters:
                 {
                     "pageNumber": 1,
                     "paragraphs": [
-                        {"content": "Valid content", "role": "paragraph"},
-                        {"content": "   ", "role": "paragraph"},  # Empty
-                        {"content": "", "role": "paragraph"},     # Empty
-                        {"content": "Another valid", "role": "paragraph"}
+                        {"_id": "para_1_0_valid", "content": "Valid content", "role": "paragraph"},
+                        {"_id": "para_1_1_empty1", "content": "   ", "role": "paragraph"},  # Empty
+                        {"_id": "para_1_2_empty2", "content": "", "role": "paragraph"},     # Empty
+                        {"_id": "para_1_3_another", "content": "Another valid", "role": "paragraph"}
                     ]
                 }
             ]
@@ -524,7 +531,7 @@ class TestApplyFilters:
             ]
         }
         
-        config = FilterConfig(filter_preset="minimal")
+        config = FilterConfig(filter_preset="citation_optimized")
         filtered_elements, mappings, metrics = apply_filters(azure_di_result, config)
         
         assert metrics.original_size_bytes > 0
@@ -552,24 +559,28 @@ class TestFilteredSegmentationEndpoint:
                     "pageNumber": 1,
                     "paragraphs": [
                         {
+                            "_id": "para_1_0_chap1",
                             "content": "Chapter 1: Introduction",
                             "role": "h1",
                             "boundingBox": {"x": 0, "y": 0},
                             "confidence": 0.99
                         },
                         {
+                            "_id": "para_1_1_long1",
                             "content": " ".join(["This is a long paragraph."] * 500),  # Long content
                             "role": "paragraph",
                             "boundingBox": {"x": 0, "y": 50},
                             "confidence": 0.98
                         },
                         {
+                            "_id": "para_1_2_sec11",
                             "content": "Section 1.1: Background",
                             "role": "h2",
                             "boundingBox": {"x": 0, "y": 100},
                             "confidence": 0.99
                         },
                         {
+                            "_id": "para_1_3_long2",
                             "content": " ".join(["Background information."] * 500),  # Long content
                             "role": "paragraph",
                             "boundingBox": {"x": 0, "y": 150},
@@ -753,21 +764,20 @@ class TestEdgeCases:
                 {
                     "pageNumber": 1,
                     "paragraphs": [
-                        {"content": "Title", "role": "h1"},
-                        {"content": "Subtitle", "role": "h2"},
-                        {"content": "Section", "role": "h3"},
-                        {"content": "Subsection", "role": "h4"},
-                        {"content": "Sub-subsection", "role": "h5"},
-                        {"content": "Deep section", "role": "h6"},
-                        {"content": "Content under deep nesting", "role": "paragraph"}
+                        {"_id": "para_1_0_title", "content": "Title", "role": "h1"},
+                        {"_id": "para_1_1_sub", "content": "Subtitle", "role": "h2"},
+                        {"_id": "para_1_2_sec", "content": "Section", "role": "h3"},
+                        {"_id": "para_1_3_subsec", "content": "Subsection", "role": "h4"},
+                        {"_id": "para_1_4_subsubsec", "content": "Sub-subsection", "role": "h5"},
+                        {"_id": "para_1_5_deep", "content": "Deep section", "role": "h6"},
+                        {"_id": "para_1_6_content", "content": "Content under deep nesting", "role": "paragraph"}
                     ]
                 }
             ]
         }
         
         config = FilterConfig(
-            filter_preset="legal_analysis",
-            contextual_fields=["parentSection"]
+            filter_preset="forensic_extraction"  # This preset includes parentSection
         )
         
         filtered_elements, mappings, metrics = apply_filters(azure_di_result, config)
@@ -781,7 +791,7 @@ class TestEdgeCases:
         """Test handling of malformed Azure DI structure."""
         # Missing pages key
         azure_di_result = {
-            "paragraphs": [{"content": "Test"}]
+            "paragraphs": [{"_id": "para_0_0_test", "content": "Test"}]
         }
         
         config = FilterConfig()
@@ -808,10 +818,10 @@ class TestEdgeCases:
                 {
                     "pageNumber": 1,
                     "paragraphs": [
-                        {"content": "Unicode: café, naïve, 你好", "role": "paragraph"},
-                        {"content": "Special: @#$%^&*(){}[]", "role": "paragraph"},
-                        {"content": 'Quotes: "double" and \'single\'', "role": "paragraph"},
-                        {"content": "Newlines:\nand\ttabs", "role": "paragraph"}
+                        {"_id": "para_1_0_unicode", "content": "Unicode: café, naïve, 你好", "role": "paragraph"},
+                        {"_id": "para_1_1_special", "content": "Special: @#$%^&*(){}[]", "role": "paragraph"},
+                        {"_id": "para_1_2_quotes", "content": 'Quotes: "double" and \'single\'', "role": "paragraph"},
+                        {"_id": "para_1_3_newlines", "content": "Newlines:\nand\ttabs", "role": "paragraph"}
                     ]
                 }
             ]
@@ -837,6 +847,7 @@ class TestEdgeCases:
                     "pageNumber": 1,
                     "paragraphs": [
                         {
+                            "_id": "para_1_0_long",
                             "content": long_content,
                             "role": "paragraph",
                             "boundingBox": {"x": 0, "y": 0},
@@ -847,7 +858,7 @@ class TestEdgeCases:
             ]
         }
         
-        config = FilterConfig(filter_preset="minimal")
+        config = FilterConfig(filter_preset="citation_optimized")
         filtered_elements, mappings, metrics = apply_filters(azure_di_result, config)
         
         assert len(filtered_elements) == 1
@@ -885,9 +896,9 @@ class TestEdgeCases:
         """Test elements without page numbers."""
         azure_di_result = {
             "paragraphs": [
-                {"content": "No page info"},
-                {"content": "Also no page", "boundingRegions": []},
-                {"content": "Has page", "boundingRegions": [{"pageNumber": 1}]}
+                {"_id": "para_0_0_no", "content": "No page info"},
+                {"_id": "para_0_1_also", "content": "Also no page", "boundingRegions": []},
+                {"_id": "para_0_2_has", "content": "Has page", "boundingRegions": [{"pageNumber": 1}]}
             ]
         }
         
@@ -932,7 +943,7 @@ class TestPerformanceMetrics:
         
         # Test with different presets
         presets_reduction = {}
-        for preset in ["minimal", "content_extraction", "structured_qa", "legal_analysis"]:
+        for preset in ["citation_optimized", "llm_ready", "forensic_extraction"]:
             config = FilterConfig(filter_preset=preset)
             _, _, metrics = apply_filters(azure_di_result, config)
             presets_reduction[preset] = metrics.reduction_percentage
@@ -949,8 +960,8 @@ class TestPerformanceMetrics:
                 {
                     "pageNumber": 1,
                     "paragraphs": [
-                        {"content": "Test content for hashing"},
-                        {"content": "Test content for hashing"}  # Same content
+                        {"_id": "para_1_0_hash1", "content": "Test content for hashing"},
+                        {"_id": "para_1_1_hash2", "content": "Test content for hashing"}  # Same content
                     ]
                 }
             ]
