@@ -29,4 +29,6 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = []
+dev = [
+    "reportlab>=4.4.2",
+]

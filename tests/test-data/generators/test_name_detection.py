@@ -44,7 +44,7 @@ def test_name_detection():
     
     try:
         response = requests.post(
-            "http://localhost:8000/anonymization/anonymize-azure-di",
+            "http://localhost:8000/anonymize-azure-di",
             json=request_data,
             timeout=1200  # 20 minutes for BERT processing
         )
@@ -106,7 +106,7 @@ def test_all_entities():
     
     try:
         response = requests.post(
-            "http://localhost:8000/anonymization/anonymize-azure-di",
+            "http://localhost:8000/anonymize-azure-di",
             json=request_data,
             timeout=1200  # 20 minutes for BERT processing
         )

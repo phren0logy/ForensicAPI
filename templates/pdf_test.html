@@ -1,22 +1,27 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>PDF to Markdown Test</title>
+    <title>PDF Extraction Test</title>
   </head>
   <body>
-    <h1>PDF to Markdown Test</h1>
+    <h1>PDF Extraction Test</h1>
     <form action="/pdf-test" method="post" enctype="multipart/form-data">
       <input type="file" name="file" accept="application/pdf" required />
-      <button type="submit">Upload and Convert</button>
+      <button type="submit">Upload and Extract</button>
     </form>
-    {% if markdown %}
-    <h2>Result</h2>
+    {% if result %}
+    <h2>Extraction Result</h2>
+    {% if result.markdown_content %}
+    <h3>Markdown Content:</h3>
     <a
-      href="data:text/markdown;charset=utf-8,{{ markdown | urlencode }}"
-      download="converted.md"
+      href="data:text/markdown;charset=utf-8,{{ result.markdown_content | urlencode }}"
+      download="extracted.md"
       >Download Markdown</a
     >
-    <pre>{{ markdown }}</pre>
+    <pre style="max-height: 400px; overflow-y: auto;">{{ result.markdown_content }}</pre>
+    {% endif %}
+    <h3>Analysis Result:</h3>
+    <pre style="max-height: 400px; overflow-y: auto;">{{ result.analysis_result | tojson(indent=2) }}</pre>
     {% endif %}
   </body>
 </html>

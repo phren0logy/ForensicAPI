@@ -14,7 +14,7 @@ import sys
 
 # Backend URL
 BACKEND_URL = "http://localhost:8000"
-ANONYMIZATION_ENDPOINT = f"{BACKEND_URL}/anonymization/anonymize-azure-di"
+ANONYMIZATION_ENDPOINT = f"{BACKEND_URL}/anonymize-azure-di"
 
 # Sample Azure DI JSON with PII (simplified structure)
 SAMPLE_AZURE_DI_JSON = {

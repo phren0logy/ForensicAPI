@@ -11,8 +11,8 @@ import sys
 
 # Backend URL
 BACKEND_URL = "http://localhost:8000"
-ANONYMIZATION_ENDPOINT = f"{BACKEND_URL}/anonymization/anonymize-azure-di"
-HEALTH_ENDPOINT = f"{BACKEND_URL}/anonymization/health"
+ANONYMIZATION_ENDPOINT = f"{BACKEND_URL}/anonymize-azure-di"
+HEALTH_ENDPOINT = f"{BACKEND_URL}/health"
 
 # Synthetic test data directory
 SYNTHETIC_DIR = Path(__file__).parent.parent / "synthetic"

@@ -25,7 +25,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 # Initialize router
-router = APIRouter(prefix="/anonymization", tags=["anonymization"])
+router = APIRouter(tags=["anonymization"])
 
 # Initialize Faker for consistent replacements
 fake = Faker()

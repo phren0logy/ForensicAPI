@@ -5,7 +5,7 @@ import requests
 
 # Test health endpoint
 try:
-    response = requests.get("http://localhost:8000/anonymization/health", timeout=5)
+    response = requests.get("http://localhost:8000/health", timeout=5)
     print(f"Health check status: {response.status_code}")
     if response.status_code != 200:
         print(f"Response: {response.text}")
@@ -20,7 +20,7 @@ try:
         "azure_di_json": {"content": "Test"},
         "config": {"preserve_structure": True}
     }
-    response = requests.post("http://localhost:8000/anonymization/anonymize-azure-di", 
+    response = requests.post("http://localhost:8000/anonymize-azure-di", 
                            json=simple_data, timeout=5)
     print(f"\nAnonymize endpoint status: {response.status_code}")
     if response.status_code != 200:

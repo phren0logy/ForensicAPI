@@ -20,12 +20,12 @@ This project includes simple HTML forms for testing endpoints.
 
 2. **Visit the test pages in your browser:**
 
-   - [PDF to Markdown Test](http://127.0.0.1:8000/pdf-test)
+   - [PDF Extraction Test](http://127.0.0.1:8000/pdf-test)
    - [Prompt Composer Test](http://127.0.0.1:8000/prompt-test)
 
-3. **PDF to Markdown Test**
+3. **PDF Extraction Test**
 
-   - Upload a PDF file and download the converted markdown.
+   - Upload a PDF file to test the extraction endpoint with Azure Document Intelligence.
 
 4. **Prompt Composer Test**
    - Fill in the fields and submit to see the composed prompt result.
@@ -36,7 +36,7 @@ This project includes simple HTML forms for testing endpoints.
 
 ### Prerequisites
 
-- Python 3.8+
+- Python 3.13+
 - Install dependencies using [uv](https://github.com/astral-sh/uv):
   ```sh
   uv sync
@@ -264,7 +264,7 @@ uv run run.py
     }
     ```
 
-### `/anonymization/anonymize-azure-di` (POST)
+### `/anonymize-azure-di` (POST)
 
 - **Description:** Anonymizes sensitive information in Azure Document Intelligence output using advanced NLP models.
 - **Request:**

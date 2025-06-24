@@ -10,7 +10,7 @@ templates = Jinja2Templates(directory="templates")
 @router.get("/pdf-test", response_class=HTMLResponse)
 async def pdf_test_form(request: Request):
     return templates.TemplateResponse(
-        "pdf_test.html", {"request": request, "markdown": None}
+        "pdf_test.html", {"request": request, "result": None}
     )
 
 
@@ -18,12 +18,12 @@ async def pdf_test_form(request: Request):
 async def pdf_test_submit(request: Request, file: UploadFile = File(...)):
     async with httpx.AsyncClient(timeout=300.0) as client:
         resp = await client.post(
-            "http://127.0.0.1:8000/pdf-to-markdown",
+            "http://127.0.0.1:8000/extract",
             files={"file": (file.filename, await file.read(), "application/pdf")},
         )
-        markdown = resp.text
+        result = resp.json()
     return templates.TemplateResponse(
-        "pdf_test.html", {"request": request, "markdown": markdown}
+        "pdf_test.html", {"request": request, "result": result}
     )
 
 
