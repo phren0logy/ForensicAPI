@@ -10,8 +10,11 @@ from typing import Any, Dict, List, Optional, Set, Tuple, Union
 from pydantic import BaseModel, Field
 import hashlib
 import json
+from fastapi import APIRouter
 
 logger = logging.getLogger(__name__)
+
+router = APIRouter(prefix="/filter", tags=["filtering"])
 
 # --- Pydantic Models ---
 
@@ -82,6 +85,16 @@ FILTER_PRESETS = {
                    "documentMetadata"]
     }
 }
+
+def get_preset_description(preset_name: str) -> str:
+    """Get description for a filter preset."""
+    descriptions = {
+        "no_filter": "Includes all fields from the original document without filtering",
+        "citation_optimized": "Minimal fields for citation tracking: ID, content, page number, and footer",
+        "llm_ready": "Balanced set of fields optimized for LLM processing with context",
+        "forensic_extraction": "Comprehensive extraction including document metadata for detailed analysis"
+    }
+    return descriptions.get(preset_name, "Custom preset")
 
 # --- Filtering Logic ---
 
@@ -302,3 +315,19 @@ def apply_filters(
                 f"{reduction_pct:.1f}% size reduction")
     
     return filtered_elements, element_mappings, metrics
+
+# --- API Routes ---
+
+@router.get("/presets")
+async def get_filter_presets():
+    """Get available filter presets."""
+    return {
+        "presets": list(FILTER_PRESETS.keys()),
+        "details": {
+            name: {
+                "fields": preset["fields"],
+                "description": get_preset_description(name)
+            }
+            for name, preset in FILTER_PRESETS.items()
+        }
+    }
