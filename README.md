@@ -1,10 +1,16 @@
-# FastAPI Reusable Prototyping App
+# ForensicAPI
 
-## Test the Endpoints with Built-in HTML Pages
+This is a tool to facilitate LLM experiments with PDFs, especially those that contain sensitive information. Remember to only use services that provide appropriate privacy. Because of the Azure policy covering HIPAA and providing a BAA for Azure customers, many of the functions of this library are Azure-centric.
 
-This project includes simple HTML forms for testing endpoints.
+This application provides an API that uses Azure Document Intelligence to convert PDFs to Markdown and structured JSON, handling PDFs of arbitrary size (rather than being limited to Azure's single-request limit of 2000 pages). The system preserves document structure through intelligent segmentation that maintains hierarchical heading context (H1-H6). Every JSON element is automatically assigned a unique ID for tracing back to the source document. The filtering endpoint facilitates stripping out unnecessary JSON components to optimize for LLM token usage.
 
-### How to Use:
+There is also an endpoint to anonymize documents using Presidio and a PII-oriented BERT library, as well as an endpoint to compose prompts around large documents with instructions and the beginning and the end (as recommended by the GPT-4.1 documentation).
+
+## Test the Endpoints
+
+### Using the API Documentation
+
+FastAPI provides automatic interactive API documentation:
 
 1. **Start the FastAPI server:**
 
@@ -18,17 +24,16 @@ This project includes simple HTML forms for testing endpoints.
    uvicorn main:app --reload
    ```
 
-2. **Visit the test pages in your browser:**
+2. **Visit the interactive documentation:**
 
-   - [PDF Extraction Test](http://127.0.0.1:8000/pdf-test)
-   - [Prompt Composer Test](http://127.0.0.1:8000/prompt-test)
+   - [Swagger UI](http://127.0.0.1:8000/docs) - Interactive API testing
+   - [ReDoc](http://127.0.0.1:8000/redoc) - Alternative API documentation
 
-3. **PDF Extraction Test**
-
-   - Upload a PDF file to test the extraction endpoint with Azure Document Intelligence.
-
-4. **Prompt Composer Test**
-   - Fill in the fields and submit to see the composed prompt result.
+3. **Test endpoints directly** through the Swagger UI interface by:
+   - Clicking on any endpoint
+   - Clicking "Try it out"
+   - Filling in the request parameters
+   - Clicking "Execute"
 
 ---
 
@@ -37,10 +42,35 @@ This project includes simple HTML forms for testing endpoints.
 ### Prerequisites
 
 - Python 3.13+
+- Azure Document Intelligence account and credentials
 - Install dependencies using [uv](https://github.com/astral-sh/uv):
   ```sh
   uv sync
   ```
+
+### Environment Configuration
+
+The application requires Azure Document Intelligence credentials. Create a `.env` file in the project root with:
+
+```env
+# Azure Document Intelligence Configuration
+AZURE_DI_ENDPOINT=https://your-resource-name.cognitiveservices.azure.com/
+AZURE_DI_KEY=your-api-key-here
+
+# Optional: Logging level (DEBUG, INFO, WARNING, ERROR)
+LOG_LEVEL=INFO
+```
+
+**Important**: Never commit the `.env` file to version control. It's already included in `.gitignore`.
+
+### Key Dependencies
+
+- **[Azure Document Intelligence](https://azure.microsoft.com/en-us/products/ai-services/ai-document-intelligence/)**: Enterprise-grade PDF to structured data extraction
+- **[Presidio](https://microsoft.github.io/presidio/)**: Microsoft's data protection and anonymization SDK
+- **[Isotonic AI4Privacy DistilBERT](https://huggingface.co/Isotonic/distilbert_finetuned_ai4privacy_v2)**: Privacy-focused BERT model with 99.77% PII detection accuracy
+- **[FastAPI](https://fastapi.tiangolo.com/)**: Modern, fast web framework with automatic API documentation
+- **[UV](https://github.com/astral-sh/uv)**: Ultra-fast Python package and project management
+- **Python 3.13+**: Required for latest performance improvements and type hints
 
 ### Running the Server
 
@@ -51,6 +81,18 @@ uv run run.py
 ```
 
 ## API Endpoints
+
+### `/` (GET)
+
+- **Description:** Root endpoint that returns information about all available API endpoints.
+- **Response:**
+  - JSON object with welcome message and list of available endpoints with their descriptions.
+
+### `/health` (GET)
+
+- **Description:** Health check endpoint to verify the service is running.
+- **Response:**
+  - JSON object with status "healthy" and timestamp.
 
 ### `/compose-prompt` (POST)
 
@@ -67,10 +109,10 @@ uv run run.py
 - **Example (text only):**
   ```json
   {
-    "document": "Some document text",
-    "transcript": "Transcript goes here",
-    "manual": "Manual text",
-    "instructions": "Do not share."
+    "document": "Text of your document goes here",
+    "transcript": "Transcript of therapy session goes here",
+    "manual": "Scoring manual for scoring therapy session fidelity",
+    "instructions": "Score the attached transcript, wrapped in transcript tags, according to the manual, wrapped in manual tags. Provide a score for each scale in the manual."
   }
   ```
 
@@ -134,7 +176,7 @@ uv run run.py
 
 ### `/segment` (POST)
 
-- **Description:** Transforms complete Azure Document Intelligence analysis results into rich, structurally-aware segments with configurable token thresholds. Implements Phase 2 of the PDF processing strategy for creating large, coherent document chunks suitable for advanced analysis.
+- **Description:** Transforms complete Azure Document Intelligence analysis results into rich, structurally-aware segments with configurable token thresholds. This creates large, coherent document chunks suitable for advanced analysis.
 - **Request:**
   - A JSON object with the following structure:
     ```json
@@ -204,7 +246,7 @@ uv run run.py
   - **Parameters:**
     - `filter_config.filter_preset`: Name of preset or "custom" (optional, default: "llm_ready")
     - `filter_config.fields`: Custom list of fields to include when using "custom" preset (optional)
-    - `filter_config.include_element_ids`: Whether to include _id fields (optional, default: true)
+    - `filter_config.include_element_ids`: Whether to include \_id fields (optional, default: true)
 - **Filter Presets:**
   - `no_filter`: Preserves all original fields (returns raw dictionary format)
   - `llm_ready`: Optimal balance - includes content, structure, and headers/footers for citations (default)
@@ -264,17 +306,148 @@ uv run run.py
     }
     ```
 
-### `/anonymize-azure-di` (POST)
+### `/filter/presets` (GET)
 
-- **Description:** Anonymizes sensitive information in Azure Document Intelligence output using advanced NLP models.
-- **Request:**
-  - A JSON object containing the Azure DI analysis result (with or without element IDs)
-- **Features:**
-  - Uses BERT-based models for accurate PII detection
-  - Supports custom entity patterns
-  - Preserves document structure and element IDs
+- **Description:** Returns all available filter presets and their descriptions for use with the filtering and segmentation endpoints.
 - **Response:**
-  - Anonymized version of the input with sensitive data replaced
+  - JSON object containing preset names as keys and their configurations as values:
+    ```json
+    {
+      "no_filter": {
+        "description": "Preserves all original fields from Azure DI",
+        "fields": ["*"]
+      },
+      "llm_ready": {
+        "description": "Optimal balance for LLM processing - includes content, structure, and headers/footers",
+        "fields": [
+          "_id",
+          "content",
+          "pageNumber",
+          "role",
+          "elementType",
+          "elementIndex",
+          "pageHeader",
+          "pageFooter",
+          "parentSection"
+        ]
+      },
+      "forensic_extraction": {
+        "description": "Includes document metadata for complex multi-document analysis",
+        "fields": [
+          "_id",
+          "content",
+          "pageNumber",
+          "role",
+          "elementType",
+          "elementIndex",
+          "pageHeader",
+          "pageFooter",
+          "parentSection",
+          "documentMetadata"
+        ]
+      },
+      "citation_optimized": {
+        "description": "Minimal fields - content, page numbers, and IDs only",
+        "fields": ["_id", "content", "pageNumber", "elementIndex", "pageFooter"]
+      }
+    }
+    ```
+
+### `/anonymization/anonymize-azure-di` (POST)
+
+- **Description:** Anonymizes sensitive information in Azure Document Intelligence output using advanced BERT-based NLP models. This is currently "one-way" in that de-anonymization is not presently supported.
+- **Request:**
+  - A JSON object with the following structure:
+    ```json
+    {
+      "azure_di_json": {
+        /* Azure DI analysis result */
+      },
+      "config": {
+        "entity_types": [
+          "PERSON",
+          "DATE_TIME",
+          "LOCATION",
+          "PHONE_NUMBER",
+          "EMAIL_ADDRESS",
+          "US_SSN",
+          "MEDICAL_LICENSE"
+        ],
+        "score_threshold": 0.5,
+        "consistent_replacements": true,
+        "date_shift_days": 365,
+        "return_decision_process": false
+      }
+    }
+    ```
+- **Features:**
+  - Uses Isotonic's privacy-focused DistilBERT model (99.77% accuracy)
+  - Configurable confidence threshold to reduce false positives
+  - Realistic date anonymization by shifting dates consistently
+  - Consistent replacements - same input always gets same replacement
+  - Preserves document structure and element IDs
+  - Optional decision process debugging
+- **Currently Supported Entity Types:**
+  - PERSON, DATE_TIME, LOCATION, PHONE_NUMBER, EMAIL_ADDRESS, US_SSN, MEDICAL_LICENSE
+- **Planned Entity Types (not yet implemented):**
+  - BATES_NUMBER, CASE_NUMBER, MEDICAL_RECORD_NUMBER (forensic document patterns)
+- **Response:**
+  - JSON object containing:
+    ```json
+    {
+      "anonymized_json": { /* Anonymized Azure DI JSON */ },
+      "statistics": { "PERSON": 5, "DATE_TIME": 2, ... },
+      "mappings_id": "a1b2c3d4..."
+    }
+    ```
+
+### `/anonymization/anonymize-markdown` (POST)
+
+- **Description:** Anonymizes sensitive information in markdown or plain text while preserving formatting.
+- **Request:**
+  - A JSON object with the following structure:
+    ```json
+    {
+      "markdown_text": "Your markdown or plain text content...",
+      "config": {
+        "entity_types": ["PERSON", "DATE_TIME", ...],
+        "score_threshold": 0.5,
+        "consistent_replacements": true,
+        "return_decision_process": false
+      }
+    }
+    ```
+- **Features:**
+  - Same powerful anonymization engine as the Azure DI endpoint
+  - Preserves markdown formatting (headers, lists, code blocks, etc.)
+  - Configurable entity detection with score threshold
+  - Consistent replacements across the document
+  - Optional decision process for debugging
+- **Response:**
+  - JSON object containing:
+    ```json
+    {
+      "anonymized_text": "Anonymized markdown content...",
+      "statistics": { "PERSON": 3, "EMAIL_ADDRESS": 2, ... },
+      "mappings_id": "e5f6g7h8...",
+      "decision_process": [ /* optional debugging info */ ]
+    }
+    ```
+
+### `/anonymization/health` (GET)
+
+- **Description:** Health check endpoint for the anonymization service. Verifies that the BERT model is loaded and ready.
+- **Response:**
+  - JSON object with service status and model information:
+    ```json
+    {
+      "status": "healthy",
+      "service": "anonymization",
+      "bert_engine": true,
+      "model": "Isotonic/distilbert_finetuned_ai4privacy_v2"
+    }
+    ```
+  - Returns `"status": "unhealthy"` with error details if the service is not ready.
 
 ## Element ID System
 
@@ -283,8 +456,9 @@ The FastAPI backend implements a stable element identification system that enabl
 ### ID Generation Strategy
 
 Element IDs are generated during the extraction phase (`/extract`) and follow this format:
+
 - **Pattern**: `{element_type}_{page}_{global_index}_{content_hash}`
-- **Examples**: 
+- **Examples**:
   - `para_1_0_a3f2b1` - First paragraph on page 1
   - `table_5_2_d4e5f6` - Third table on page 5
   - `cell_5_2_0_0_b7c8d9` - Cell at row 0, column 0 in the third table on page 5
@@ -315,6 +489,176 @@ Element IDs are generated during the extraction phase (`/extract`) and follow th
 - **Debugging**: Easy to correlate elements across different processing stages
 - **Caching**: Can cache processed elements by ID for efficiency
 
----
+## Performance and Limits
 
-For questions or issues, please contact the project maintainer.
+- **PDF Processing**:
+  - Maximum tested: 353+ pages with perfect reconstruction
+  - Default batch size: 1500 pages per Azure DI request
+  - Concurrent batch processing for optimal speed
+  - Sub-second execution for most operations
+- **Segmentation**:
+  - Token limits: Configurable 10k-30k tokens per segment
+  - Intelligent boundary detection at H1/H2 headings
+  - Minimal memory usage through streaming architecture
+- **Anonymization**:
+  - Sub-second processing for typical documents
+  - BERT model initialization: ~2-3 seconds on first request
+  - Consistent 99.77% accuracy for PII detection
+- **API Limits**:
+  - Request size: Limited by web server configuration (typically 100MB)
+  - Timeout: Default 120 seconds, configurable
+  - Concurrent requests: Handled by multiple workers (default: 4)
+
+## Anonymization Configuration Parameters
+
+The anonymization endpoints support the following configuration parameters:
+
+- **entity_types**: List of entity types to detect and anonymize
+  - Currently supported: `PERSON`, `DATE_TIME`, `LOCATION`, `PHONE_NUMBER`, `EMAIL_ADDRESS`, `US_SSN`, `MEDICAL_LICENSE`
+  - Planned (not yet implemented): `BATES_NUMBER`, `CASE_NUMBER`, `MEDICAL_RECORD_NUMBER`
+- **score_threshold**: Minimum confidence score (0.0-1.0, default: 0.5)
+  - Higher values reduce false positives but may miss some entities
+  - Recommended range: 0.5-0.7
+- **consistent_replacements**: Use same replacement for identical values (default: true)
+- **date_shift_days**: Maximum days to shift dates for anonymization (default: 365)
+- **return_decision_process**: Include debugging information about detection reasoning (default: false)
+
+## Planned Features
+
+- **Forensic Document Pattern Detection**:
+  - Bates number recognition (e.g., "ABC-123456")
+  - Case number patterns (e.g., "2024-CR-00156")
+  - Medical record numbers (e.g., "MRN: 12345678")
+- **Custom Regex Pattern Support**: Allow users to define domain-specific entity patterns
+- **Multi-language Support**: Currently English-only, planning to add other languages
+- **Batch Processing**: Anonymize multiple documents in a single request
+- **Deanonymization Support**: Reversible anonymization with secure key management
+
+## Example Workflow
+
+Here's a complete workflow showing how to process a sensitive PDF document:
+
+### 1. Extract PDF Content with Element IDs
+
+```bash
+# Extract structured data from PDF
+curl -X POST http://localhost:8000/extract \
+  -F "file=@confidential_document.pdf" \
+  -F "batch_size=1500" \
+  -F "include_element_ids=true" \
+  > extracted_result.json
+```
+
+### 2. Filter and Segment for LLM Processing
+
+```bash
+# Prepare document for LLM with optimized token usage
+curl -X POST http://localhost:8000/segment-filtered \
+  -H "Content-Type: application/json" \
+  -d '{
+    "source_file": "confidential_document.pdf",
+    "analysis_result": '$(cat extracted_result.json | jq .analysis_result)',
+    "filter_config": {
+      "filter_preset": "llm_ready",
+      "include_element_ids": true
+    },
+    "min_segment_tokens": 10000,
+    "max_segment_tokens": 30000
+  }' \
+  > segmented_result.json
+```
+
+### 3. Anonymize Sensitive Content (Optional)
+
+```bash
+# Remove PII before sending to LLM
+curl -X POST http://localhost:8000/anonymization/anonymize-azure-di \
+  -H "Content-Type: application/json" \
+  -d '{
+    "azure_di_json": '$(cat extracted_result.json | jq .analysis_result)',
+    "config": {
+      "entity_types": ["PERSON", "EMAIL_ADDRESS", "PHONE_NUMBER", "US_SSN"],
+      "score_threshold": 0.6,
+      "consistent_replacements": true
+    }
+  }' \
+  > anonymized_result.json
+```
+
+### 4. Compose Prompt for LLM
+
+```bash
+# Create structured prompt with instructions
+curl -X POST http://localhost:8000/compose-prompt \
+  -F 'mapping={"instructions":"Summarize the key findings","document":"@segmented_result.json"}' \
+  -F "document=@segmented_result.json" \
+  > final_prompt.txt
+```
+
+## Error Handling
+
+### Common Errors and Solutions
+
+- **413 Request Entity Too Large**
+
+  - Solution: Reduce the `batch_size` parameter in `/extract`
+  - Default file size limit can be increased in server configuration
+
+- **Azure DI Timeout (504 Gateway Timeout)**
+
+  - Large PDFs may exceed Azure's processing time
+  - Solution: Use smaller batch sizes (e.g., 500-1000 pages)
+
+- **Memory Errors**
+
+  - For documents with many tables or complex layouts
+  - Solution: Process in smaller segments or increase server memory
+
+- **BERT Model Loading Errors**
+
+  - First request may fail if model download is interrupted
+  - Solution: Run `uv run python scripts/setup_anonymization.py` to pre-download
+
+- **Invalid Azure Credentials**
+  - Check your `.env` file configuration
+  - Verify endpoint URL includes `https://` and trailing `/`
+
+### Debugging Tips
+
+1. Enable debug logging: Set `LOG_LEVEL=DEBUG` in `.env`
+2. Check element IDs for tracking issues through the pipeline
+3. Use `/anonymization/health` to verify service status
+4. Test with smaller documents first
+
+## Security Considerations
+
+### Data Protection
+
+- **Use HTTPS in Production**: Always deploy with TLS/SSL certificates
+- **Secure Credentials**:
+  - Store Azure keys in environment variables, never in code
+  - Use Azure Key Vault or similar for production deployments
+  - Rotate API keys regularly
+
+### Anonymization Best Practices
+
+- **One-Way Anonymization**: Mappings are not stored by default
+- **Review Output**: Always verify anonymized content before sharing
+- **Consistent Replacements**: Enable for documents that need internal consistency
+- **Score Threshold**: Adjust based on your security requirements (higher = fewer false positives)
+
+### Network Security
+
+- **API Authentication**: Consider adding authentication middleware for production
+- **Network Isolation**: Deploy in a private network for sensitive documents
+- **Rate Limiting**: Implement to prevent abuse
+- **CORS Configuration**: Restrict to trusted domains only
+
+### Compliance Notes
+
+- Azure Document Intelligence is HIPAA compliant with proper configuration
+- Anonymization helps meet GDPR/CCPA requirements
+- Audit logs should be implemented for forensic use cases
+- Consider data residency requirements for your jurisdiction
+
+---

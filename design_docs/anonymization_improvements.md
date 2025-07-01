@@ -14,9 +14,11 @@ This document outlines the planned improvements to the anonymization endpoints t
 ## Root Causes
 
 1. **Custom Pattern Recognizers**: The custom regex patterns for name detection are too broad:
+
    ```python
    Pattern(regex=r"\b([A-Z][a-z]+\s+){1,3}[A-Z][a-z]+\b", score=0.85)
    ```
+
    This matches any sequence of capitalized words, including headings and proper nouns that aren't names.
 
 2. **Low Score Threshold**: The default Presidio score threshold is too low (0.0-0.2), accepting many low-confidence detections
@@ -30,6 +32,7 @@ This document outlines the planned improvements to the anonymization endpoints t
 ### Phase 1: Remove Custom Recognizers
 
 **Changes:**
+
 1. Delete the `get_custom_recognizers()` function entirely
 2. Remove the following code from `initialize_engines()`:
    ```python
@@ -39,6 +42,7 @@ This document outlines the planned improvements to the anonymization endpoints t
    ```
 
 **Rationale:**
+
 - The BERT model (Isotonic/distilbert_finetuned_ai4privacy_v2) is already trained on PII detection
 - Custom patterns are causing false positives
 - Presidio's built-in recognizers + BERT model are sufficient
@@ -46,12 +50,14 @@ This document outlines the planned improvements to the anonymization endpoints t
 ### Phase 2: Add Score Threshold Configuration
 
 **Changes:**
+
 1. Add to `AnonymizationConfig`:
+
    ```python
    score_threshold: float = Field(
-       default=0.5, 
-       ge=0.0, 
-       le=1.0, 
+       default=0.5,
+       ge=0.0,
+       le=1.0,
        description="Minimum confidence score for entity detection (0.0-1.0)"
    )
    ```
@@ -59,14 +65,15 @@ This document outlines the planned improvements to the anonymization endpoints t
 2. Update `anonymize_text_field()` to use the threshold:
    ```python
    results = analyzer.analyze(
-       text=text, 
-       language="en", 
-       entities=entity_types, 
+       text=text,
+       language="en",
+       entities=entity_types,
        score_threshold=score_threshold
    )
    ```
 
 **Rationale:**
+
 - Presidio documentation recommends 0.5-0.7 for reducing false positives
 - This is a built-in Presidio feature designed for this purpose
 - Allows users to adjust sensitivity as needed
@@ -74,7 +81,9 @@ This document outlines the planned improvements to the anonymization endpoints t
 ### Phase 3: Improve Date Anonymization
 
 **Changes:**
+
 1. Add imports:
+
    ```python
    from dateutil import parser as date_parser
    from datetime import datetime, timedelta
@@ -86,14 +95,14 @@ This document outlines the planned improvements to the anonymization endpoints t
        # Parse the original date
        try:
            parsed_date = date_parser.parse(original_value)
-           
+
            # Get or create consistent shift for this session
            if "date_shift_days" not in replacement_mappings:
                replacement_mappings["date_shift_days"] = random.randint(-date_shift_days, date_shift_days)
-           
+
            shift = replacement_mappings["date_shift_days"]
            shifted_date = parsed_date + timedelta(days=shift)
-           
+
            # Format based on original format hints
            if len(original_value) <= 10:  # Likely just a date
                replacement = shifted_date.strftime("%B %d, %Y")
@@ -105,6 +114,7 @@ This document outlines the planned improvements to the anonymization endpoints t
    ```
 
 **Rationale:**
+
 - Provides realistic, readable dates
 - Maintains temporal relationships with consistent shifting
 - Follows Presidio's custom operator pattern
@@ -114,13 +124,15 @@ This document outlines the planned improvements to the anonymization endpoints t
 **Problem:** Current code creates one operator config per entity TYPE, causing all entities of that type to use the same replacement.
 
 **Solution:**
+
 1. Create individual operator configs for each detection:
+
    ```python
    # Instead of creating operators dict by type, create for each result
    for i, result in enumerate(filtered_results):
        entity_type = result.entity_type
        original_text = text[result.start:result.end]
-       
+
        if use_consistent:
            replacement = get_consistent_replacement(
                entity_type, original_text, date_shift_days
@@ -128,7 +140,7 @@ This document outlines the planned improvements to the anonymization endpoints t
        else:
            # Generate unique replacement for each detection
            replacement = generate_replacement(entity_type)
-       
+
        # Store replacement for this specific result
        result.replacement = replacement
    ```
@@ -136,26 +148,30 @@ This document outlines the planned improvements to the anonymization endpoints t
 2. Use the anonymizer with individual replacements
 
 **Rationale:**
+
 - Preserves original spacing between words
 - Each detection gets proper handling
 
 ### Phase 5: Add Optional Decision Process
 
 **Changes:**
+
 1. Add to `AnonymizationConfig`:
+
    ```python
    return_decision_process: bool = Field(
-       default=False, 
+       default=False,
        description="Include detailed detection reasoning in response"
    )
    ```
 
 2. Update `anonymize_text_field()`:
+
    ```python
    results = analyzer.analyze(
-       text=text, 
-       language="en", 
-       entities=entity_types, 
+       text=text,
+       language="en",
+       entities=entity_types,
        score_threshold=score_threshold,
        return_decision_process=return_decision_process
    )
@@ -164,6 +180,7 @@ This document outlines the planned improvements to the anonymization endpoints t
 3. Include decision process in response when requested
 
 **Rationale:**
+
 - Helps debug false positives
 - Built-in Presidio feature
 - Optional to avoid overhead when not needed
@@ -171,12 +188,14 @@ This document outlines the planned improvements to the anonymization endpoints t
 ### Phase 6: Refactor Function Signatures
 
 **Changes:**
+
 1. Update `anonymize_text_field()` signature:
+
    ```python
    def anonymize_text_field(
-       text: str, 
-       analyzer: AnalyzerEngine, 
-       anonymizer: AnonymizerEngine, 
+       text: str,
+       analyzer: AnalyzerEngine,
+       anonymizer: AnonymizerEngine,
        config: AnonymizationConfig
    ) -> tuple[str, Dict[str, int], Optional[Dict]]:
    ```
@@ -184,6 +203,7 @@ This document outlines the planned improvements to the anonymization endpoints t
 2. Update all callers to pass config object instead of individual parameters
 
 **Rationale:**
+
 - Cleaner API
 - Easier to add new configuration options
 - Ensures all endpoints benefit from improvements
@@ -191,12 +211,14 @@ This document outlines the planned improvements to the anonymization endpoints t
 ## Testing Strategy
 
 1. **Unit Tests**: Update existing tests to verify:
+
    - No false positives on common headings
    - Proper date formatting
    - Correct spacing preservation
    - Score threshold filtering
 
 2. **Integration Tests**: Test with various document types:
+
    - Markdown documents
    - Azure DI JSON
    - Mixed content with real and fake PII
@@ -208,11 +230,13 @@ This document outlines the planned improvements to the anonymization endpoints t
 ### API Changes
 
 1. **Function Signature Change**:
+
    - Old: `anonymize_text_field(text, analyzer, anonymizer, entity_types, use_consistent, date_shift_days, use_bert)`
    - New: `anonymize_text_field(text, analyzer, anonymizer, config)`
    - Callers must pass a config object instead of individual parameters
 
 2. **Removed Features**:
+
    - Custom pattern recognizers (BATES_NUMBER, CASE_NUMBER, MEDICAL_RECORD_NUMBER) - use BERT model detection only
    - `use_bert` parameter - BERT is now always used
    - Individual parameter passing - must use config object
@@ -234,6 +258,7 @@ This document outlines the planned improvements to the anonymization endpoints t
 ### Update Required for Callers
 
 Any code calling the anonymization endpoints must:
+
 1. Remove BATES_NUMBER, CASE_NUMBER from entity_types lists
 2. Expect different date formats in output (realistic dates vs [DATE_SHIFTED_X])
 3. Adjust for potentially fewer detections due to higher score threshold
@@ -250,8 +275,10 @@ Any code calling the anonymization endpoints must:
 1. Remove custom recognizers (highest impact on false positives)
 2. Add score threshold configuration
 3. Fix spacing issue
-4. Improve date anonymization  
+4. Improve date anonymization
 5. Add decision process debugging
 6. Refactor function signatures
 
 This order prioritizes the most impactful fixes first while maintaining system stability throughout the changes.
+
+Planned improvement: Redaction of Bates numbers in Azure DI Layout model Markdown footers
