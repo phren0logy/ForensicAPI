@@ -12,8 +12,9 @@ import json
 import hashlib
 from datetime import datetime, timedelta
 import random
+from dateutil import parser as date_parser
 
-from presidio_analyzer import AnalyzerEngine, RecognizerResult, PatternRecognizer, Pattern
+from presidio_analyzer import AnalyzerEngine, RecognizerResult
 from presidio_analyzer.nlp_engine import TransformersNlpEngine
 from presidio_anonymizer import AnonymizerEngine, OperatorConfig
 from presidio_anonymizer.entities import OperatorResult
@@ -38,14 +39,14 @@ class AnonymizationConfig(BaseModel):
     entity_types: List[str] = Field(
         default=[
             "PERSON", "DATE_TIME", "LOCATION", "PHONE_NUMBER", 
-            "EMAIL_ADDRESS", "US_SSN", "MEDICAL_LICENSE", 
-            "BATES_NUMBER", "CASE_NUMBER"
+            "EMAIL_ADDRESS", "US_SSN", "MEDICAL_LICENSE"
         ],
         description="Entity types to anonymize"
     )
     date_shift_days: int = Field(default=365, description="Maximum days to shift dates")
     consistent_replacements: bool = Field(default=True, description="Use consistent replacements for same values")
-    use_bert_ner: bool = Field(default=True, description="Use BERT for enhanced NER")
+    score_threshold: float = Field(default=0.5, ge=0.0, le=1.0, description="Minimum confidence score for entity detection")
+    return_decision_process: bool = Field(default=False, description="Include detailed detection reasoning")
     custom_patterns: Optional[Dict[str, str]] = Field(default=None, description="Custom regex patterns")
 
 
@@ -73,6 +74,7 @@ class MarkdownAnonymizationResponse(BaseModel):
     anonymized_text: str = Field(..., description="Anonymized markdown text")
     statistics: Dict[str, int] = Field(..., description="Count of anonymized entities by type")
     mappings_id: Optional[str] = Field(None, description="ID for retrieving anonymization mappings")
+    decision_process: Optional[List[Dict]] = Field(None, description="Detection reasoning if requested")
 
 
 # Global engines (initialized on first use)
@@ -82,187 +84,49 @@ anonymizer_engine: Optional[AnonymizerEngine] = None
 # Replacement mappings for consistent anonymization
 replacement_mappings: Dict[str, Dict[str, str]] = {}
 
-# Entity type mapping for Isotonic BERT model
-# Maps fine-grained entity types to standard Presidio types
-ENTITY_TYPE_MAPPING = {
-    "FIRSTNAME": "PERSON",
-    "LASTNAME": "PERSON",
-    "MIDDLENAME": "PERSON",
-    "PREFIX": "PERSON",  # Dr., Mr., etc.
-    "USERNAME": "PERSON",
-    "DOB": "DATE_TIME",
-    "DATE": "DATE_TIME",
-    "TIME": "DATE_TIME",
-    "AGE": "DATE_TIME",
-    "PHONENUMBER": "PHONE_NUMBER",
-    "CITY": "LOCATION",
-    "STATE": "LOCATION",
-    "COUNTY": "LOCATION",
-    "STREET": "LOCATION",
-    "ZIPCODE": "LOCATION",
-    "BUILDINGNAME": "LOCATION",
-    "SECONDARYADDRESS": "LOCATION",
-    "SSN": "US_SSN",
-    "IDCARDNUMBER": "US_SSN",  # Often used for SSN
-    "ACCOUNTNUMBER": "US_BANK_NUMBER",
-    "PIN": "US_BANK_NUMBER",
-    "CREDITCARDNUMBER": "CREDIT_CARD",
-    "EMAIL": "EMAIL_ADDRESS",
-    "URL": "URL",
-    "IPV4": "IP_ADDRESS",
-    "IPV6": "IP_ADDRESS",
-    "MAC": "IP_ADDRESS",  # MAC addresses
-    "VEHICLEVRM": "LICENSE_PLATE",
-    "VEHICLEVINNUMBER": "LICENSE_PLATE",
-    "DRIVERLICENSE": "US_DRIVER_LICENSE",
-}
 
 
-def get_custom_recognizers() -> List[PatternRecognizer]:
-    """Create custom recognizers for forensic document patterns."""
-    recognizers = []
-    
-    # Add custom name recognizer for common name patterns
-    name_recognizer = PatternRecognizer(
-        supported_entity="PERSON",
-        patterns=[
-            Pattern(
-                name="full_name",
-                regex=r"\b([A-Z][a-z]+\s+){1,3}[A-Z][a-z]+\b",  # John Smith, John A. Smith
-                score=0.85
-            ),
-            Pattern(
-                name="name_with_title",
-                regex=r"\b(Mr\.|Mrs\.|Ms\.|Dr\.|Prof\.)\s+[A-Z][a-z]+(\s+[A-Z]\.?\s+)?[A-Z][a-z]+\b",
-                score=0.9
-            ),
-            Pattern(
-                name="all_caps_name",
-                regex=r"\b[A-Z]{2,}(\s+[A-Z]{2,})+\b",  # JOHN SMITH
-                score=0.8
-            )
-        ]
-    )
-    recognizers.append(name_recognizer)
-    
-    # Bates number recognizer
-    bates_recognizer = PatternRecognizer(
-        supported_entity="BATES_NUMBER",
-        patterns=[
-            Pattern(
-                name="bates_standard",
-                regex=r"\b[A-Z]{2,4}[-_]?\d{6,8}\b",
-                score=0.9
-            ),
-            Pattern(
-                name="bates_with_prefix",
-                regex=r"\bBATES[-_]?\d{6,8}\b",
-                score=0.95
-            )
-        ]
-    )
-    recognizers.append(bates_recognizer)
-    
-    # Case number recognizer
-    case_recognizer = PatternRecognizer(
-        supported_entity="CASE_NUMBER",
-        patterns=[
-            Pattern(
-                name="case_standard",
-                regex=r"\b\d{2,4}[-/]\w{2,4}[-/]\d{3,6}\b",
-                score=0.85
-            ),
-            Pattern(
-                name="case_with_prefix",
-                regex=r"\b(?:Case|Docket|File)[\s#:]+[\w-]+\b",
-                score=0.9
-            )
-        ]
-    )
-    recognizers.append(case_recognizer)
-    
-    # Medical record number recognizer
-    medical_record_recognizer = PatternRecognizer(
-        supported_entity="MEDICAL_RECORD_NUMBER",
-        patterns=[
-            Pattern(
-                name="mrn_standard",
-                regex=r"\b(?:MRN|MR#?)[\s:]*\d{6,10}\b",
-                score=0.95
-            ),
-            Pattern(
-                name="patient_id",
-                regex=r"\b(?:Patient ID|Pt ID)[\s:]*\d{6,10}\b",
-                score=0.9
-            )
-        ]
-    )
-    recognizers.append(medical_record_recognizer)
-    
-    return recognizers
-
-
-def initialize_engines(use_bert: bool = True) -> tuple[AnalyzerEngine, AnonymizerEngine]:
-    """Initialize Presidio engines with optional BERT support."""
+def initialize_engines() -> tuple[AnalyzerEngine, AnonymizerEngine]:
+    """Initialize Presidio engines with BERT model."""
     global analyzer_engine, anonymizer_engine
     
     if analyzer_engine is None:
         logger.info("Initializing Presidio engines...")
         
         try:
-            if use_bert:
-                # Initialize with privacy-focused BERT model
-                from presidio_analyzer.nlp_engine import NlpEngineProvider
-                
-                # Use Isotonic's privacy-focused BERT model
-                # This model is specifically fine-tuned for PII detection
-                nlp_config = {
-                    "nlp_engine_name": "transformers",
-                    "models": [{
-                        "lang_code": "en",
-                        "model_name": {
-                            "spacy": "en_core_web_md",  # For tokenization only
-                            "transformers": "Isotonic/distilbert_finetuned_ai4privacy_v2",
-                            "model_kwargs": {
-                                "max_length": 512,  # Handle longer texts
-                                "aggregation_strategy": "simple"  # Better for PII detection
-                            }
-                        }
-                    }]
-                }
-                
-                logger.info("Loading privacy-focused BERT model: Isotonic/distilbert_finetuned_ai4privacy_v2")
-                
-                # Create NLP engine
-                provider = NlpEngineProvider(nlp_configuration=nlp_config)
-                nlp_engine = provider.create_engine()
-                
-                # Create analyzer with privacy-focused BERT
-                analyzer_engine = AnalyzerEngine(
-                    nlp_engine=nlp_engine,
-                    supported_languages=["en"]
-                )
-                
-                logger.info("✅ Privacy-focused BERT model loaded successfully")
-                
-            else:
-                # Pattern-based analyzer without NLP
-                logger.info("Using pattern-based recognition only")
-                # Create analyzer with registry only - no NLP
-                from presidio_analyzer import RecognizerRegistry
-                
-                # Create empty registry
-                registry = RecognizerRegistry()
-                registry.load_predefined_recognizers(["en"])
-                
-                analyzer_engine = AnalyzerEngine(
-                    registry=registry,
-                    supported_languages=["en"]
-                )
+            # Initialize with privacy-focused BERT model
+            from presidio_analyzer.nlp_engine import NlpEngineProvider
             
-            # Add custom recognizers for forensic patterns
-            for recognizer in get_custom_recognizers():
-                analyzer_engine.registry.add_recognizer(recognizer)
+            # Use Isotonic's privacy-focused BERT model
+            # This model is specifically fine-tuned for PII detection
+            nlp_config = {
+                "nlp_engine_name": "transformers",
+                "models": [{
+                    "lang_code": "en",
+                    "model_name": {
+                        "spacy": "en_core_web_md",  # For tokenization only
+                        "transformers": "Isotonic/distilbert_finetuned_ai4privacy_v2",
+                        "model_kwargs": {
+                            "max_length": 512,  # Handle longer texts
+                            "aggregation_strategy": "simple"  # Better for PII detection
+                        }
+                    }
+                }]
+            }
+            
+            logger.info("Loading privacy-focused BERT model: Isotonic/distilbert_finetuned_ai4privacy_v2")
+            
+            # Create NLP engine
+            provider = NlpEngineProvider(nlp_configuration=nlp_config)
+            nlp_engine = provider.create_engine()
+            
+            # Create analyzer with privacy-focused BERT
+            analyzer_engine = AnalyzerEngine(
+                nlp_engine=nlp_engine,
+                supported_languages=["en"]
+            )
+            
+            logger.info("✅ Privacy-focused BERT model loaded successfully")
             
             # Initialize anonymizer
             anonymizer_engine = AnonymizerEngine()
@@ -271,13 +135,7 @@ def initialize_engines(use_bert: bool = True) -> tuple[AnalyzerEngine, Anonymize
             
         except Exception as e:
             logger.error(f"Failed to initialize BERT model: {str(e)}")
-            logger.info("Falling back to pattern-based recognition")
-            
-            # Fall back to basic mode without BERT
-            analyzer_engine = AnalyzerEngine()
-            for recognizer in get_custom_recognizers():
-                analyzer_engine.registry.add_recognizer(recognizer)
-            anonymizer_engine = AnonymizerEngine()
+            raise HTTPException(status_code=500, detail=f"Failed to initialize BERT model: {str(e)}")
     
     return analyzer_engine, anonymizer_engine
 
@@ -298,14 +156,36 @@ def get_consistent_replacement(entity_type: str, original_value: str,
     if entity_type == "PERSON":
         replacement = fake.name()
     elif entity_type == "DATE_TIME":
-        # Shift date by random amount up to date_shift_days
-        shift_days = random.randint(-date_shift_days, date_shift_days)
+        # Get or create consistent shift for this session
+        if "_date_shift_days" not in replacement_mappings:
+            replacement_mappings["_date_shift_days"] = random.randint(-date_shift_days, date_shift_days)
+        
+        shift_days = replacement_mappings["_date_shift_days"]
+        
         try:
-            # Try to parse and shift the date
-            # This is simplified - in production, use better date parsing
-            replacement = f"[DATE_SHIFTED_{shift_days}d]"
-        except:
-            replacement = f"[DATE_SHIFTED]"
+            # Parse the original date
+            parsed_date = date_parser.parse(original_value, fuzzy=True)
+            
+            # Apply the shift
+            shifted_date = parsed_date + timedelta(days=shift_days)
+            
+            # Format based on original format hints
+            if ":" in original_value and len(original_value) > 10:
+                # Likely includes time
+                replacement = shifted_date.strftime("%B %d, %Y at %I:%M %p")
+            elif "/" in original_value:
+                # US format
+                replacement = shifted_date.strftime("%m/%d/%Y")
+            elif "-" in original_value and len(original_value) == 10:
+                # ISO format
+                replacement = shifted_date.strftime("%Y-%m-%d")
+            else:
+                # Default readable format
+                replacement = shifted_date.strftime("%B %d, %Y")
+        except Exception as e:
+            # Fallback to a random date this year
+            logger.warning(f"Could not parse date '{original_value}': {e}")
+            replacement = fake.date_this_year().strftime("%B %d, %Y")
     elif entity_type == "LOCATION":
         replacement = fake.city()
     elif entity_type == "PHONE_NUMBER":
@@ -316,12 +196,6 @@ def get_consistent_replacement(entity_type: str, original_value: str,
         replacement = fake.ssn()
     elif entity_type == "MEDICAL_LICENSE":
         replacement = f"MD{fake.random_number(digits=6)}"
-    elif entity_type == "BATES_NUMBER":
-        replacement = f"ANON-{fake.random_number(digits=6)}"
-    elif entity_type == "CASE_NUMBER":
-        replacement = f"{fake.random_number(digits=4)}-CR-{fake.random_number(digits=5)}"
-    elif entity_type == "MEDICAL_RECORD_NUMBER":
-        replacement = f"MRN{fake.random_number(digits=8)}"
     else:
         replacement = f"[REDACTED_{entity_type}]"
     
@@ -332,67 +206,60 @@ def get_consistent_replacement(entity_type: str, original_value: str,
 
 def anonymize_text_field(text: str, analyzer: AnalyzerEngine, 
                         anonymizer: AnonymizerEngine, 
-                        entity_types: List[str],
-                        use_consistent: bool = True,
-                        date_shift_days: int = 365,
-                        use_bert: bool = True) -> tuple[str, Dict[str, int]]:
+                        config: AnonymizationConfig) -> tuple[str, Dict[str, int], Optional[List[Dict]]]:
     """Anonymize a text field and return statistics."""
     if not text or not isinstance(text, str):
-        return text, {}
+        return text, {}, None
     
     # Analyze the text with requested entity types
-    results = analyzer.analyze(text=text, language="en", entities=entity_types)
-    
-    # For BERT mode, also check for fine-grained types and map them
-    if use_bert and "PERSON" in entity_types:
-        # Get all results to check for name-related entities
-        all_results = analyzer.analyze(text=text, language="en", entities=None)
-        
-        # Find and add name-related entities
-        person_types = {k for k, v in ENTITY_TYPE_MAPPING.items() if v == "PERSON"}
-        for result in all_results:
-            if result.entity_type in person_types:
-                # Map to PERSON and add if not overlapping
-                mapped_result = RecognizerResult(
-                    entity_type="PERSON",
-                    start=result.start,
-                    end=result.end,
-                    score=result.score
-                )
-                # Check for overlap with existing results
-                overlap = False
-                for existing in results:
-                    if (mapped_result.start < existing.end and 
-                        mapped_result.end > existing.start):
-                        overlap = True
-                        break
-                if not overlap:
-                    results.append(mapped_result)
+    results = analyzer.analyze(
+        text=text, 
+        language="en", 
+        entities=config.entity_types,
+        score_threshold=config.score_threshold,
+        return_decision_process=config.return_decision_process
+    )
     
     # Use results directly
     filtered_results = results
     
-    # Create operators for anonymization
+    # Build replacement map and operators for each entity type
     operators = {}
     stats = {}
     
+    # Group results by entity type
+    from collections import defaultdict
+    results_by_type = defaultdict(list)
     for result in filtered_results:
-        entity_type = result.entity_type
-        original_text = text[result.start:result.end]
-        
-        if use_consistent:
-            replacement = get_consistent_replacement(
-                entity_type, original_text, date_shift_days
-            )
+        results_by_type[result.entity_type].append(result)
+    
+    # Create operators for each entity type
+    for entity_type, type_results in results_by_type.items():
+        if config.consistent_replacements:
+            # For consistent replacements, create a mapping
+            replacement_map = {}
+            for result in type_results:
+                original_text = text[result.start:result.end]
+                if original_text not in replacement_map:
+                    replacement = get_consistent_replacement(
+                        entity_type, original_text, config.date_shift_days
+                    )
+                    replacement_map[original_text] = replacement
+                    if entity_type == "DATE_TIME":
+                        logger.info(f"DATE mapping '{original_text}' -> '{replacement}'")
+            
+            # Create custom operator that uses the mapping
+            # Use default argument to capture the current replacement_map
             operators[entity_type] = OperatorConfig(
-                "replace",
-                {"new_value": replacement}
+                "custom",
+                {"lambda": lambda text, rm=replacement_map: rm.get(text, f"[NOT_FOUND:{text}]")}
             )
         else:
+            # For non-consistent, just use replace operator
             operators[entity_type] = OperatorConfig("replace")
         
         # Update statistics
-        stats[entity_type] = stats.get(entity_type, 0) + 1
+        stats[entity_type] = len(type_results)
     
     # Anonymize the text
     anonymized_result = anonymizer.anonymize(
@@ -401,7 +268,14 @@ def anonymize_text_field(text: str, analyzer: AnalyzerEngine,
         operators=operators
     )
     
-    return anonymized_result.text, stats
+    # Extract decision process if requested
+    decision_process = None
+    if config.return_decision_process and hasattr(results[0], 'analysis_explanation') if results else False:
+        decision_process = [{'entity': r.entity_type, 'start': r.start, 'end': r.end, 
+                           'score': r.score, 'explanation': getattr(r, 'analysis_explanation', None)} 
+                          for r in results]
+    
+    return anonymized_result.text, stats, decision_process
 
 
 def anonymize_azure_di_json(data: Dict[str, Any], 
@@ -424,12 +298,8 @@ def anonymize_azure_di_json(data: Dict[str, Any],
     for key, value in data.items():
         if isinstance(value, str) and (key in text_fields or config.preserve_structure):
             # Anonymize text field
-            anonymized_text, stats = anonymize_text_field(
-                value, analyzer, anonymizer,
-                config.entity_types,
-                config.consistent_replacements,
-                config.date_shift_days,
-                config.use_bert_ner
+            anonymized_text, stats, _ = anonymize_text_field(
+                value, analyzer, anonymizer, config
             )
             anonymized[key] = anonymized_text
             
@@ -451,12 +321,8 @@ def anonymize_azure_di_json(data: Dict[str, Any],
                         total_stats[entity_type] = total_stats.get(entity_type, 0) + count
                 elif isinstance(item, str):
                     # Check if it might contain PII
-                    anon_text, stats = anonymize_text_field(
-                        item, analyzer, anonymizer,
-                        config.entity_types,
-                        config.consistent_replacements,
-                        config.date_shift_days,
-                        config.use_bert_ner
+                    anon_text, stats, _ = anonymize_text_field(
+                        item, analyzer, anonymizer, config
                     )
                     anonymized_list.append(anon_text)
                     for entity_type, count in stats.items():
@@ -494,8 +360,8 @@ async def anonymize_azure_di_endpoint(request: AnonymizationRequest):
     5. Provides consistent replacements for the same values
     """
     try:
-        # Initialize engines (always use BERT for now)
-        analyzer, anonymizer = initialize_engines(use_bert=True)
+        # Initialize engines
+        analyzer, anonymizer = initialize_engines()
         
         # Clear mappings for new anonymization session
         global replacement_mappings
@@ -538,7 +404,7 @@ async def anonymize_markdown_endpoint(request: MarkdownAnonymizationRequest):
     """
     try:
         # Initialize engines
-        analyzer, anonymizer = initialize_engines(use_bert=request.config.use_bert_ner)
+        analyzer, anonymizer = initialize_engines()
         
         # Clear mappings for new anonymization session if consistent replacements enabled
         if request.config.consistent_replacements:
@@ -546,14 +412,11 @@ async def anonymize_markdown_endpoint(request: MarkdownAnonymizationRequest):
             replacement_mappings = {}
         
         # Anonymize the markdown text
-        anonymized_text, statistics = anonymize_text_field(
+        anonymized_text, statistics, decision_process = anonymize_text_field(
             request.markdown_text,
             analyzer,
             anonymizer,
-            request.config.entity_types,
-            request.config.consistent_replacements,
-            request.config.date_shift_days,
-            request.config.use_bert_ner
+            request.config
         )
         
         # Generate mappings ID (optional - for future deanonymization support)
@@ -565,7 +428,8 @@ async def anonymize_markdown_endpoint(request: MarkdownAnonymizationRequest):
         return MarkdownAnonymizationResponse(
             anonymized_text=anonymized_text,
             statistics=statistics,
-            mappings_id=mappings_id
+            mappings_id=mappings_id,
+            decision_process=decision_process
         )
         
     except Exception as e:
@@ -577,8 +441,8 @@ async def anonymize_markdown_endpoint(request: MarkdownAnonymizationRequest):
 async def health_check():
     """Check if anonymization service is ready."""
     try:
-        # Only test BERT since pattern-only isn't working without spaCy
-        analyzer, anonymizer = initialize_engines(use_bert=True)
+        # Test engine initialization
+        analyzer, anonymizer = initialize_engines()
         
         return {
             "status": "healthy",

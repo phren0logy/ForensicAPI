@@ -46,12 +46,11 @@ def test_markdown_anonymization():
         "config": {
             "preserve_structure": True,
             "consistent_replacements": True,
-            "use_bert_ner": True,
             "entity_types": [
                 "PERSON", "DATE_TIME", "LOCATION", "PHONE_NUMBER",
-                "EMAIL_ADDRESS", "US_SSN", "MEDICAL_RECORD_NUMBER",
-                "BATES_NUMBER", "CASE_NUMBER"
-            ]
+                "EMAIL_ADDRESS", "US_SSN", "MEDICAL_LICENSE"
+            ],
+            "score_threshold": 0.7
         }
     }
     
