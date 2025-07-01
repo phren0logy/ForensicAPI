@@ -4,7 +4,7 @@ This is a tool to facilitate LLM experiments with PDFs, especially those that co
 
 This application provides an API that uses Azure Document Intelligence to convert PDFs to Markdown and structured JSON, handling PDFs of arbitrary size (rather than being limited to Azure's single-request limit of 2000 pages). The system preserves document structure through intelligent segmentation that maintains hierarchical heading context (H1-H6). Every JSON element is automatically assigned a unique ID for tracing back to the source document. The filtering endpoint facilitates stripping out unnecessary JSON components to optimize for LLM token usage.
 
-There is also an endpoint to anonymize documents using Presidio and a PII-oriented BERT library, as well as an endpoint to compose prompts around large documents with instructions and the beginning and the end (as recommended by the GPT-4.1 documentation).
+There is also an endpoint to anonymize documents using Microsoft Presidio with built-in NER models for comprehensive PII detection, as well as an endpoint to compose prompts around large documents with instructions and the beginning and the end (as recommended by the GPT-4.1 documentation).
 
 ## Test the Endpoints
 
@@ -66,8 +66,8 @@ LOG_LEVEL=INFO
 ### Key Dependencies
 
 - **[Azure Document Intelligence](https://azure.microsoft.com/en-us/products/ai-services/ai-document-intelligence/)**: Enterprise-grade PDF to structured data extraction
-- **[Presidio](https://microsoft.github.io/presidio/)**: Microsoft's data protection and anonymization SDK
-- **[Isotonic AI4Privacy DistilBERT](https://huggingface.co/Isotonic/distilbert_finetuned_ai4privacy_v2)**: Privacy-focused BERT model with 99.77% PII detection accuracy
+- **[Presidio](https://microsoft.github.io/presidio/)**: Microsoft's data protection and anonymization SDK with built-in NER models
+- **[spaCy](https://spacy.io/)**: Industrial-strength NLP for entity recognition (PERSON, LOCATION, etc.)
 - **[FastAPI](https://fastapi.tiangolo.com/)**: Modern, fast web framework with automatic API documentation
 - **[UV](https://github.com/astral-sh/uv)**: Ultra-fast Python package and project management
 - **Python 3.13+**: Required for latest performance improvements and type hints
@@ -355,7 +355,7 @@ uv run run.py
 
 ### `/anonymization/anonymize-azure-di` (POST)
 
-- **Description:** Anonymizes sensitive information in Azure Document Intelligence output using advanced BERT-based NLP models. This is currently "one-way" in that de-anonymization is not presently supported.
+- **Description:** Anonymizes sensitive information in Azure Document Intelligence output using Microsoft Presidio's built-in recognizers. This is currently "one-way" in that de-anonymization is not presently supported.
 - **Request:**
   - A JSON object with the following structure:
     ```json
@@ -374,17 +374,19 @@ uv run run.py
           "MEDICAL_LICENSE"
         ],
         "score_threshold": 0.5,
-        "consistent_replacements": true,
+        "anonymize_all_strings": true,
         "date_shift_days": 365,
         "return_decision_process": false
       }
     }
     ```
 - **Features:**
-  - Uses Isotonic's privacy-focused DistilBERT model (99.77% accuracy)
+  - Uses Presidio's built-in recognizers with spaCy NER models
+  - Pattern-based detection for phone numbers, emails, SSNs, etc.
   - Configurable confidence threshold to reduce false positives
-  - Realistic date anonymization by shifting dates consistently
-  - Consistent replacements - same input always gets same replacement
+  - Realistic fake data generation using Faker library
+  - Cryptographically secure random generation for sensitive IDs
+  - Session-isolated replacements for security
   - Preserves document structure and element IDs
   - Optional decision process debugging
 - **Currently Supported Entity Types:**
@@ -396,8 +398,7 @@ uv run run.py
     ```json
     {
       "anonymized_json": { /* Anonymized Azure DI JSON */ },
-      "statistics": { "PERSON": 5, "DATE_TIME": 2, ... },
-      "mappings_id": "a1b2c3d4..."
+      "statistics": { "PERSON": 5, "DATE_TIME": 2, ... }
     }
     ```
 
@@ -412,7 +413,7 @@ uv run run.py
       "config": {
         "entity_types": ["PERSON", "DATE_TIME", ...],
         "score_threshold": 0.5,
-        "consistent_replacements": true,
+        "anonymize_all_strings": true,
         "return_decision_process": false
       }
     }
@@ -429,7 +430,6 @@ uv run run.py
     {
       "anonymized_text": "Anonymized markdown content...",
       "statistics": { "PERSON": 3, "EMAIL_ADDRESS": 2, ... },
-      "mappings_id": "e5f6g7h8...",
       "decision_process": [ /* optional debugging info */ ]
     }
     ```
@@ -443,8 +443,8 @@ uv run run.py
     {
       "status": "healthy",
       "service": "anonymization",
-      "bert_engine": true,
-      "model": "Isotonic/distilbert_finetuned_ai4privacy_v2"
+      "engines_initialized": true,
+      "recognizers": "Built-in Presidio recognizers (PERSON, US_SSN, EMAIL_ADDRESS, etc.)"
     }
     ```
   - Returns `"status": "unhealthy"` with error details if the service is not ready.
@@ -503,7 +503,7 @@ Element IDs are generated during the extraction phase (`/extract`) and follow th
 - **Anonymization**:
   - Sub-second processing for typical documents
   - BERT model initialization: ~2-3 seconds on first request
-  - Consistent 99.77% accuracy for PII detection
+  - High accuracy for common PII types
 - **API Limits**:
   - Request size: Limited by web server configuration (typically 100MB)
   - Timeout: Default 120 seconds, configurable
@@ -515,16 +515,19 @@ The anonymization endpoints support the following configuration parameters:
 
 - **entity_types**: List of entity types to detect and anonymize
   - Currently supported: `PERSON`, `DATE_TIME`, `LOCATION`, `PHONE_NUMBER`, `EMAIL_ADDRESS`, `US_SSN`, `MEDICAL_LICENSE`
-  - Planned (not yet implemented): `BATES_NUMBER`, `CASE_NUMBER`, `MEDICAL_RECORD_NUMBER`
+  - Note: US_SSN detection requires valid SSN patterns (not test patterns like 123-45-6789)
 - **score_threshold**: Minimum confidence score (0.0-1.0, default: 0.5)
   - Higher values reduce false positives but may miss some entities
   - Recommended range: 0.5-0.7
-- **consistent_replacements**: Use same replacement for identical values (default: true)
+- **anonymize_all_strings**: Anonymize all string fields (true) or only known PII fields (false) (default: true)
 - **date_shift_days**: Maximum days to shift dates for anonymization (default: 365)
 - **return_decision_process**: Include debugging information about detection reasoning (default: false)
 
 ## Planned Features
 
+- **Enhanced AI4Privacy Integration**: 
+  - Add Isotonic's AI4Privacy BERT model as an additional recognizer for improved accuracy
+  - Support for all 54 PII classes from the AI4Privacy dataset
 - **Forensic Document Pattern Detection**:
   - Bates number recognition (e.g., "ABC-123456")
   - Case number patterns (e.g., "2024-CR-00156")
@@ -532,7 +535,6 @@ The anonymization endpoints support the following configuration parameters:
 - **Custom Regex Pattern Support**: Allow users to define domain-specific entity patterns
 - **Multi-language Support**: Currently English-only, planning to add other languages
 - **Batch Processing**: Anonymize multiple documents in a single request
-- **Deanonymization Support**: Reversible anonymization with secure key management
 
 ## Example Workflow
 
@@ -579,7 +581,7 @@ curl -X POST http://localhost:8000/anonymization/anonymize-azure-di \
     "config": {
       "entity_types": ["PERSON", "EMAIL_ADDRESS", "PHONE_NUMBER", "US_SSN"],
       "score_threshold": 0.6,
-      "consistent_replacements": true
+      "anonymize_all_strings": true
     }
   }' \
   > anonymized_result.json
@@ -614,10 +616,10 @@ curl -X POST http://localhost:8000/compose-prompt \
   - For documents with many tables or complex layouts
   - Solution: Process in smaller segments or increase server memory
 
-- **BERT Model Loading Errors**
+- **spaCy Model Loading Errors**
 
-  - First request may fail if model download is interrupted
-  - Solution: Run `uv run python scripts/setup_anonymization.py` to pre-download
+  - Presidio requires spaCy language models
+  - Solution: Run `uv run python scripts/setup_anonymization.py` to download models
 
 - **Invalid Azure Credentials**
   - Check your `.env` file configuration
@@ -644,7 +646,7 @@ curl -X POST http://localhost:8000/compose-prompt \
 
 - **One-Way Anonymization**: Mappings are not stored by default
 - **Review Output**: Always verify anonymized content before sharing
-- **Consistent Replacements**: Enable for documents that need internal consistency
+- **Session Isolation**: Each anonymization request uses isolated replacement mappings
 - **Score Threshold**: Adjust based on your security requirements (higher = fewer false positives)
 
 ### Network Security
