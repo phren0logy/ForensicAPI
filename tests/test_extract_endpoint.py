@@ -165,6 +165,12 @@ def test_extract_empty_pdf():
 
 def test_extract_real_sample_pdf():
     """Test extraction with the real sample PDF if it exists."""
+    # Skip this test if running in CI or without Azure credentials
+    import os
+    if not os.environ.get("AZURE_DI_KEY"):
+        import pytest
+        pytest.skip("Skipping Azure DI test - no credentials")
+    
     sample_pdf_path = Path(__file__).parent / "sample_pdfs" / "05dracula.pdf"
     
     if sample_pdf_path.exists():

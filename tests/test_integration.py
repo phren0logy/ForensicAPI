@@ -136,11 +136,11 @@ def test_pipeline_with_anonymization():
         "azure_di_json": extract_result["analysis_result"],
         "config": {
             "score_threshold": 0.5,
-            "entities_to_recognize": ["PERSON", "EMAIL_ADDRESS", "PHONE_NUMBER"]
+            "entity_types": ["PERSON", "EMAIL_ADDRESS", "PHONE_NUMBER"]
         }
     }
     
-    anonymize_resp = client.post("/anonymize-azure-di", json=anonymize_payload)
+    anonymize_resp = client.post("/anonymization/anonymize-azure-di", json=anonymize_payload)
     assert anonymize_resp.status_code == 200
     anonymize_result = anonymize_resp.json()
     

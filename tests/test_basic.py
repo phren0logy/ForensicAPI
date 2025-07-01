@@ -44,7 +44,7 @@ def test_anonymize_azure_di_basic():
     # Test anonymization with basic Azure DI JSON structure
     azure_di_json = {
         "status": "succeeded",
-        "content": "Patient: John Smith\nSSN: 123-45-6789",
+        "content": "Patient: John Smith\nSSN: 456-78-9012",
         "paragraphs": [
             {
                 "_id": "para_1_0_abc123",
@@ -59,11 +59,11 @@ def test_anonymize_azure_di_basic():
         "azure_di_json": azure_di_json,
         "config": {
             "score_threshold": 0.5,
-            "entities_to_recognize": ["PERSON", "US_SSN", "DATE_TIME"]
+            "entity_types": ["PERSON", "US_SSN", "DATE_TIME"]
         }
     }
     
-    resp = client.post("/anonymize-azure-di", json=payload)
+    resp = client.post("/anonymization/anonymize-azure-di", json=payload)
     assert resp.status_code == 200
     
     result = resp.json()
@@ -73,11 +73,11 @@ def test_anonymize_azure_di_basic():
     # Check that PII was anonymized
     anonymized_content = result["anonymized_json"]["content"]
     assert "John Smith" not in anonymized_content
-    assert "123-45-6789" not in anonymized_content
+    assert "456-78-9012" not in anonymized_content
     
     # Check that element IDs are preserved
     assert result["anonymized_json"]["paragraphs"][0]["_id"] == "para_1_0_abc123"
 
 def test_anonymize_azure_di_missing_payload():
-    resp = client.post("/anonymize-azure-di")
+    resp = client.post("/anonymization/anonymize-azure-di")
     assert resp.status_code == 422  # Unprocessable Entity

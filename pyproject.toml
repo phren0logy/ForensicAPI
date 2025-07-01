@@ -28,5 +28,6 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "pytest-asyncio>=1.0.0",
     "reportlab>=4.4.2",
 ]

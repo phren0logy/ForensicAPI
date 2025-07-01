@@ -440,7 +440,7 @@ class TestSegmentationEdgeCases:
         response = client.post("/segment", json=payload)
         assert response.status_code == 200
         
-        segments = response.json()["segments"]
+        segments = response.json()
         # Should create single segment even if it exceeds max
         assert len(segments) == 1
         assert segments[0]["token_count"] > 3000
@@ -500,7 +500,7 @@ class TestSegmentationEdgeCases:
             assert response.status_code == 200
             
             # Verify table structure is preserved
-            segments = response.json()["segments"]
+            segments = response.json()
             assert len(segments) > 0
 
 
