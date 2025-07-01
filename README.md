@@ -4,7 +4,7 @@ This is a tool to facilitate LLM experiments with PDFs, especially those that co
 
 This application provides an API that uses Azure Document Intelligence to convert PDFs to Markdown and structured JSON, handling PDFs of arbitrary size (rather than being limited to Azure's single-request limit of 2000 pages). The system preserves document structure through intelligent segmentation that maintains hierarchical heading context (H1-H6). Every JSON element is automatically assigned a unique ID for tracing back to the source document. The filtering endpoint facilitates stripping out unnecessary JSON components to optimize for LLM token usage.
 
-There is also an endpoint to anonymize documents using Microsoft Presidio with built-in NER models for comprehensive PII detection, as well as an endpoint to compose prompts around large documents with instructions and the beginning and the end (as recommended by the GPT-4.1 documentation).
+There is also an endpoint to anonymize documents using LLM-Guard with the AI4Privacy BERT model for comprehensive PII detection (54 entity types with 97.8% F1 score), as well as an endpoint to compose prompts around large documents with instructions and the beginning and the end (as recommended by the GPT-4.1 documentation).
 
 ## Test the Endpoints
 
@@ -66,8 +66,7 @@ LOG_LEVEL=INFO
 ### Key Dependencies
 
 - **[Azure Document Intelligence](https://azure.microsoft.com/en-us/products/ai-services/ai-document-intelligence/)**: Enterprise-grade PDF to structured data extraction
-- **[Presidio](https://microsoft.github.io/presidio/)**: Microsoft's data protection and anonymization SDK with built-in NER models
-- **[spaCy](https://spacy.io/)**: Industrial-strength NLP for entity recognition (PERSON, LOCATION, etc.)
+- **[LLM-Guard](https://llm-guard.com/)**: Advanced PII detection and anonymization with AI4Privacy BERT model (54 PII types)
 - **[FastAPI](https://fastapi.tiangolo.com/)**: Modern, fast web framework with automatic API documentation
 - **[UV](https://github.com/astral-sh/uv)**: Ultra-fast Python package and project management
 - **Python 3.13+**: Required for latest performance improvements and type hints
@@ -355,7 +354,7 @@ uv run run.py
 
 ### `/anonymization/anonymize-azure-di` (POST)
 
-- **Description:** Anonymizes sensitive information in Azure Document Intelligence output using Microsoft Presidio's built-in recognizers. This is currently "one-way" in that de-anonymization is not presently supported.
+- **Description:** Anonymizes sensitive information in Azure Document Intelligence output using LLM-Guard with the AI4Privacy BERT model. This is currently "one-way" in that de-anonymization is not presently supported.
 - **Request:**
   - A JSON object with the following structure:
     ```json
@@ -381,18 +380,24 @@ uv run run.py
     }
     ```
 - **Features:**
-  - Uses Presidio's built-in recognizers with spaCy NER models
-  - Pattern-based detection for phone numbers, emails, SSNs, etc.
+  - Uses LLM-Guard with AI4Privacy BERT model (Isotonic/distilbert_finetuned_ai4privacy_v2)
+  - Detects 54 different PII types with 97.8% F1 score
+  - Advanced pattern recognition beyond basic NER
   - Configurable confidence threshold to reduce false positives
   - Realistic fake data generation using Faker library
   - Cryptographically secure random generation for sensitive IDs
   - Session-isolated replacements for security
   - Preserves document structure and element IDs
   - Optional decision process debugging
-- **Currently Supported Entity Types:**
-  - PERSON, DATE_TIME, LOCATION, PHONE_NUMBER, EMAIL_ADDRESS, US_SSN, MEDICAL_LICENSE
-- **Planned Entity Types (not yet implemented):**
-  - BATES_NUMBER, CASE_NUMBER, MEDICAL_RECORD_NUMBER (forensic document patterns)
+- **Supported Entity Types:**
+  - All 54 PII types from AI4Privacy model including:
+    - Personal: Names, ages, gender, occupation, education
+    - Financial: Bank accounts, credit cards, IBANs
+    - Contact: Emails, phones, addresses, URLs
+    - Technical: IP addresses, crypto wallets, API keys
+    - Medical: Diagnoses, medications, conditions
+    - Legal: Case numbers, court names
+  - Note: You can specify a subset of entity types in the config
 - **Response:**
   - JSON object containing:
     ```json
@@ -436,7 +441,7 @@ uv run run.py
 
 ### `/anonymization/health` (GET)
 
-- **Description:** Health check endpoint for the anonymization service. Verifies that the BERT model is loaded and ready.
+- **Description:** Health check endpoint for the anonymization service. Verifies that the LLM-Guard scanner with AI4Privacy BERT model is ready.
 - **Response:**
   - JSON object with service status and model information:
     ```json
@@ -444,7 +449,8 @@ uv run run.py
       "status": "healthy",
       "service": "anonymization",
       "engines_initialized": true,
-      "recognizers": "Built-in Presidio recognizers (PERSON, US_SSN, EMAIL_ADDRESS, etc.)"
+      "recognizers": "LLM-Guard with AI4Privacy model (54 PII types)",
+      "model": "Isotonic/distilbert_finetuned_ai4privacy_v2"
     }
     ```
   - Returns `"status": "unhealthy"` with error details if the service is not ready.
@@ -514,20 +520,21 @@ Element IDs are generated during the extraction phase (`/extract`) and follow th
 The anonymization endpoints support the following configuration parameters:
 
 - **entity_types**: List of entity types to detect and anonymize
-  - Currently supported: `PERSON`, `DATE_TIME`, `LOCATION`, `PHONE_NUMBER`, `EMAIL_ADDRESS`, `US_SSN`, `MEDICAL_LICENSE`
+  - Default: Basic types like `PERSON`, `DATE_TIME`, `LOCATION`, `PHONE_NUMBER`, `EMAIL_ADDRESS`, `US_SSN`, `MEDICAL_LICENSE`
+  - AI4Privacy model supports 54 PII types - leave empty to detect all
   - Note: US_SSN detection requires valid SSN patterns (not test patterns like 123-45-6789)
 - **score_threshold**: Minimum confidence score (0.0-1.0, default: 0.5)
   - Higher values reduce false positives but may miss some entities
   - Recommended range: 0.5-0.7
 - **anonymize_all_strings**: Anonymize all string fields (true) or only known PII fields (false) (default: true)
 - **date_shift_days**: Maximum days to shift dates for anonymization (default: 365)
-- **return_decision_process**: Include debugging information about detection reasoning (default: false)
+- **return_decision_process**: Include debugging information about detection reasoning (default: false) - Note: Not currently supported with LLM-Guard
 
 ## Planned Features
 
-- **Enhanced AI4Privacy Integration**: 
-  - Add Isotonic's AI4Privacy BERT model as an additional recognizer for improved accuracy
-  - Support for all 54 PII classes from the AI4Privacy dataset
+- **Deanonymization Support**: 
+  - Leverage LLM-Guard's vault system for reversible anonymization
+  - Stateless deanonymization with encrypted keys
 - **Forensic Document Pattern Detection**:
   - Bates number recognition (e.g., "ABC-123456")
   - Case number patterns (e.g., "2024-CR-00156")
@@ -616,10 +623,10 @@ curl -X POST http://localhost:8000/compose-prompt \
   - For documents with many tables or complex layouts
   - Solution: Process in smaller segments or increase server memory
 
-- **spaCy Model Loading Errors**
+- **AI4Privacy Model Loading Errors**
 
-  - Presidio requires spaCy language models
-  - Solution: Run `uv run python scripts/setup_anonymization.py` to download models
+  - LLM-Guard will download the AI4Privacy model on first use
+  - Solution: Ensure internet connectivity for model download (~134MB)
 
 - **Invalid Azure Credentials**
   - Check your `.env` file configuration
@@ -644,7 +651,7 @@ curl -X POST http://localhost:8000/compose-prompt \
 
 ### Anonymization Best Practices
 
-- **One-Way Anonymization**: Mappings are not stored by default
+- **One-Way Anonymization**: Mappings are not stored by default (future deanonymization support planned)
 - **Review Output**: Always verify anonymized content before sharing
 - **Session Isolation**: Each anonymization request uses isolated replacement mappings
 - **Score Threshold**: Adjust based on your security requirements (higher = fewer false positives)

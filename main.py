@@ -6,7 +6,7 @@ from routes.root import router as root_router
 from routes.segmentation import router as segmentation_router
 from routes.anonymization import router as anonymization_router
 from routes.filtering import router as filtering_router
-from test_pages_ui import router as test_pages_router
+from routes.test_ui import router as test_pages_router
 
 app = FastAPI()
 

@@ -81,8 +81,7 @@ uv add --dev package-name
 # Generate test fixtures from Azure DI
 uv run python scripts/generate_test_fixtures.py
 
-# Setup anonymization models
-uv run python scripts/setup_anonymization.py
+# Note: AI4Privacy model downloads automatically on first use
 
 # Quick testing
 uv run python tests/quick_test.py
