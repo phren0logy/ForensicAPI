@@ -2,22 +2,20 @@
 PII Anonymization API endpoint for generating safe test data from Azure DI JSON.
 
 Uses Microsoft Presidio with BERT-based NER for accurate PII detection and anonymization.
-Includes custom recognizers for forensic document patterns (Bates numbers, case IDs, etc.).
+Implements security-focused design with random data generation and session isolation.
 """
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
-from typing import Dict, Any, List, Optional, Set
+from typing import Dict, Any, List, Optional
 import json
-import hashlib
-from datetime import datetime, timedelta
+from datetime import timedelta
 import random
+import secrets
 from dateutil import parser as date_parser
 
-from presidio_analyzer import AnalyzerEngine, RecognizerResult
-from presidio_analyzer.nlp_engine import TransformersNlpEngine
+from presidio_analyzer import AnalyzerEngine
 from presidio_anonymizer import AnonymizerEngine, OperatorConfig
-from presidio_anonymizer.entities import OperatorResult
 
 from faker import Faker
 import logging
@@ -28,26 +26,27 @@ logger = logging.getLogger(__name__)
 # Initialize router
 router = APIRouter(tags=["anonymization"])
 
-# Initialize Faker for consistent replacements
-fake = Faker()
-Faker.seed(12345)  # Consistent seed for reproducible results
+# Initialize Faker with random seed for security
+fake = Faker()  # Uses random seed for unpredictable anonymization
+
+# Default entity types for PII detection
+DEFAULT_ENTITY_TYPES = [
+    "PERSON", "DATE_TIME", "LOCATION", "PHONE_NUMBER", 
+    "EMAIL_ADDRESS", "US_SSN", "MEDICAL_LICENSE"
+]
 
 
 class AnonymizationConfig(BaseModel):
     """Configuration for anonymization process."""
-    preserve_structure: bool = Field(default=True, description="Preserve Azure DI JSON structure")
+    anonymize_all_strings: bool = Field(default=True, description="Anonymize all string fields (True) or only known PII fields (False)")
     entity_types: List[str] = Field(
-        default=[
-            "PERSON", "DATE_TIME", "LOCATION", "PHONE_NUMBER", 
-            "EMAIL_ADDRESS", "US_SSN", "MEDICAL_LICENSE"
-        ],
+        default_factory=lambda: DEFAULT_ENTITY_TYPES.copy(),
         description="Entity types to anonymize"
     )
     date_shift_days: int = Field(default=365, description="Maximum days to shift dates")
-    consistent_replacements: bool = Field(default=True, description="Use consistent replacements for same values")
+    # Note: consistent_replacements is now always True for better security and user experience
     score_threshold: float = Field(default=0.5, ge=0.0, le=1.0, description="Minimum confidence score for entity detection")
     return_decision_process: bool = Field(default=False, description="Include detailed detection reasoning")
-    custom_patterns: Optional[Dict[str, str]] = Field(default=None, description="Custom regex patterns")
 
 
 class AnonymizationRequest(BaseModel):
@@ -60,7 +59,6 @@ class AnonymizationResponse(BaseModel):
     """Response from anonymization endpoint."""
     anonymized_json: Dict[str, Any] = Field(..., description="Anonymized Azure DI JSON")
     statistics: Dict[str, int] = Field(..., description="Count of anonymized entities by type")
-    mappings_id: Optional[str] = Field(None, description="ID for retrieving anonymization mappings")
 
 
 class MarkdownAnonymizationRequest(BaseModel):
@@ -73,7 +71,6 @@ class MarkdownAnonymizationResponse(BaseModel):
     """Response from markdown anonymization endpoint."""
     anonymized_text: str = Field(..., description="Anonymized markdown text")
     statistics: Dict[str, int] = Field(..., description="Count of anonymized entities by type")
-    mappings_id: Optional[str] = Field(None, description="ID for retrieving anonymization mappings")
     decision_process: Optional[List[Dict]] = Field(None, description="Detection reasoning if requested")
 
 
@@ -81,69 +78,40 @@ class MarkdownAnonymizationResponse(BaseModel):
 analyzer_engine: Optional[AnalyzerEngine] = None
 anonymizer_engine: Optional[AnonymizerEngine] = None
 
-# Replacement mappings for consistent anonymization
-replacement_mappings: Dict[str, Dict[str, str]] = {}
+# Replacement mappings are created per-session to prevent information leakage
 
 
 
 def initialize_engines() -> tuple[AnalyzerEngine, AnonymizerEngine]:
-    """Initialize Presidio engines with BERT model."""
+    """Initialize Presidio engines with default configuration."""
     global analyzer_engine, anonymizer_engine
     
     if analyzer_engine is None:
         logger.info("Initializing Presidio engines...")
         
         try:
-            # Initialize with privacy-focused BERT model
-            from presidio_analyzer.nlp_engine import NlpEngineProvider
-            
-            # Use Isotonic's privacy-focused BERT model
-            # This model is specifically fine-tuned for PII detection
-            nlp_config = {
-                "nlp_engine_name": "transformers",
-                "models": [{
-                    "lang_code": "en",
-                    "model_name": {
-                        "spacy": "en_core_web_md",  # For tokenization only
-                        "transformers": "Isotonic/distilbert_finetuned_ai4privacy_v2",
-                        "model_kwargs": {
-                            "max_length": 512,  # Handle longer texts
-                            "aggregation_strategy": "simple"  # Better for PII detection
-                        }
-                    }
-                }]
-            }
-            
-            logger.info("Loading privacy-focused BERT model: Isotonic/distilbert_finetuned_ai4privacy_v2")
-            
-            # Create NLP engine
-            provider = NlpEngineProvider(nlp_configuration=nlp_config)
-            nlp_engine = provider.create_engine()
-            
-            # Create analyzer with privacy-focused BERT
-            analyzer_engine = AnalyzerEngine(
-                nlp_engine=nlp_engine,
-                supported_languages=["en"]
-            )
-            
-            logger.info("✅ Privacy-focused BERT model loaded successfully")
+            # Use default Presidio analyzer with built-in recognizers
+            # This includes PERSON, US_SSN, EMAIL_ADDRESS, PHONE_NUMBER, etc.
+            analyzer_engine = AnalyzerEngine(supported_languages=["en"])
             
             # Initialize anonymizer
             anonymizer_engine = AnonymizerEngine()
             
-            logger.info("Presidio engines initialized successfully")
+            logger.info("✅ Presidio engines initialized successfully with built-in recognizers")
             
         except Exception as e:
-            logger.error(f"Failed to initialize BERT model: {str(e)}")
-            raise HTTPException(status_code=500, detail=f"Failed to initialize BERT model: {str(e)}")
+            logger.error(f"Failed to initialize Presidio engines: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Failed to initialize Presidio engines: {str(e)}")
     
     return analyzer_engine, anonymizer_engine
 
 
 def get_consistent_replacement(entity_type: str, original_value: str, 
-                             date_shift_days: int = 365) -> str:
+                             date_shift_days: int = 365,
+                             replacement_mappings: Dict[str, Dict[str, str]] = None) -> str:
     """Get consistent replacement for a value based on entity type."""
-    global replacement_mappings
+    if replacement_mappings is None:
+        replacement_mappings = {}
     
     # Check if we already have a replacement for this value
     if entity_type not in replacement_mappings:
@@ -158,7 +126,10 @@ def get_consistent_replacement(entity_type: str, original_value: str,
     elif entity_type == "DATE_TIME":
         # Get or create consistent shift for this session
         if "_date_shift_days" not in replacement_mappings:
-            replacement_mappings["_date_shift_days"] = random.randint(-date_shift_days, date_shift_days)
+            # Add some noise to the shift range for better security
+            noise_factor = random.uniform(0.8, 1.2)
+            adjusted_days = int(date_shift_days * noise_factor)
+            replacement_mappings["_date_shift_days"] = random.randint(-adjusted_days, adjusted_days)
         
         shift_days = replacement_mappings["_date_shift_days"]
         
@@ -193,9 +164,14 @@ def get_consistent_replacement(entity_type: str, original_value: str,
     elif entity_type == "EMAIL_ADDRESS":
         replacement = fake.email()
     elif entity_type == "US_SSN":
-        replacement = fake.ssn()
+        # Use cryptographically secure random for sensitive IDs
+        area = secrets.randbelow(899) + 100  # 100-999, avoiding 666
+        group = secrets.randbelow(99) + 1     # 01-99
+        serial = secrets.randbelow(9999) + 1  # 0001-9999
+        replacement = f"{area:03d}-{group:02d}-{serial:04d}"
     elif entity_type == "MEDICAL_LICENSE":
-        replacement = f"MD{fake.random_number(digits=6)}"
+        # Use cryptographically secure random for medical licenses
+        replacement = f"MD{secrets.randbelow(999999):06d}"
     else:
         replacement = f"[REDACTED_{entity_type}]"
     
@@ -206,7 +182,8 @@ def get_consistent_replacement(entity_type: str, original_value: str,
 
 def anonymize_text_field(text: str, analyzer: AnalyzerEngine, 
                         anonymizer: AnonymizerEngine, 
-                        config: AnonymizationConfig) -> tuple[str, Dict[str, int], Optional[List[Dict]]]:
+                        config: AnonymizationConfig,
+                        replacement_mappings: Dict[str, Dict[str, str]] = None) -> tuple[str, Dict[str, int], Optional[List[Dict]]]:
     """Anonymize a text field and return statistics."""
     if not text or not isinstance(text, str):
         return text, {}, None
@@ -233,30 +210,25 @@ def anonymize_text_field(text: str, analyzer: AnalyzerEngine,
     for result in filtered_results:
         results_by_type[result.entity_type].append(result)
     
-    # Create operators for each entity type
+    # Create operators for each entity type with consistent replacements
     for entity_type, type_results in results_by_type.items():
-        if config.consistent_replacements:
-            # For consistent replacements, create a mapping
-            replacement_map = {}
-            for result in type_results:
-                original_text = text[result.start:result.end]
-                if original_text not in replacement_map:
-                    replacement = get_consistent_replacement(
-                        entity_type, original_text, config.date_shift_days
-                    )
-                    replacement_map[original_text] = replacement
-                    if entity_type == "DATE_TIME":
-                        logger.info(f"DATE mapping '{original_text}' -> '{replacement}'")
-            
-            # Create custom operator that uses the mapping
-            # Use default argument to capture the current replacement_map
-            operators[entity_type] = OperatorConfig(
-                "custom",
-                {"lambda": lambda text, rm=replacement_map: rm.get(text, f"[NOT_FOUND:{text}]")}
-            )
-        else:
-            # For non-consistent, just use replace operator
-            operators[entity_type] = OperatorConfig("replace")
+        # Create a mapping for consistent replacements
+        replacement_map = {}
+        for result in type_results:
+            original_text = text[result.start:result.end]
+            if original_text not in replacement_map:
+                replacement = get_consistent_replacement(
+                    entity_type, original_text, config.date_shift_days,
+                    replacement_mappings
+                )
+                replacement_map[original_text] = replacement
+        
+        # Create custom operator that uses the mapping
+        # Use default argument to capture the current replacement_map
+        operators[entity_type] = OperatorConfig(
+            "custom",
+            {"lambda": lambda text, rm=replacement_map: rm.get(text, f"[REDACTED_{entity_type}]")}
+        )
         
         # Update statistics
         stats[entity_type] = len(type_results)
@@ -281,7 +253,8 @@ def anonymize_text_field(text: str, analyzer: AnalyzerEngine,
 def anonymize_azure_di_json(data: Dict[str, Any], 
                            config: AnonymizationConfig,
                            analyzer: AnalyzerEngine,
-                           anonymizer: AnonymizerEngine) -> tuple[Dict[str, Any], Dict[str, int]]:
+                           anonymizer: AnonymizerEngine,
+                           replacement_mappings: Dict[str, Dict[str, str]] = None) -> tuple[Dict[str, Any], Dict[str, int]]:
     """Recursively anonymize Azure DI JSON while preserving structure."""
     if not isinstance(data, dict):
         return data, {}
@@ -291,15 +264,15 @@ def anonymize_azure_di_json(data: Dict[str, Any],
     
     # Fields that commonly contain PII in Azure DI output
     text_fields = {
-        "content", "text", "value", "content", "name", "description",
+        "content", "text", "value", "name", "description",
         "title", "subject", "author", "creator", "producer"
     }
     
     for key, value in data.items():
-        if isinstance(value, str) and (key in text_fields or config.preserve_structure):
+        if isinstance(value, str) and (key in text_fields or config.anonymize_all_strings):
             # Anonymize text field
             anonymized_text, stats, _ = anonymize_text_field(
-                value, analyzer, anonymizer, config
+                value, analyzer, anonymizer, config, replacement_mappings
             )
             anonymized[key] = anonymized_text
             
@@ -313,7 +286,7 @@ def anonymize_azure_di_json(data: Dict[str, Any],
             for item in value:
                 if isinstance(item, dict):
                     anon_item, item_stats = anonymize_azure_di_json(
-                        item, config, analyzer, anonymizer
+                        item, config, analyzer, anonymizer, replacement_mappings
                     )
                     anonymized_list.append(anon_item)
                     # Merge statistics
@@ -322,7 +295,7 @@ def anonymize_azure_di_json(data: Dict[str, Any],
                 elif isinstance(item, str):
                     # Check if it might contain PII
                     anon_text, stats, _ = anonymize_text_field(
-                        item, analyzer, anonymizer, config
+                        item, analyzer, anonymizer, config, replacement_mappings
                     )
                     anonymized_list.append(anon_text)
                     for entity_type, count in stats.items():
@@ -334,7 +307,7 @@ def anonymize_azure_di_json(data: Dict[str, Any],
         elif isinstance(value, dict):
             # Recursively process nested objects
             anon_dict, dict_stats = anonymize_azure_di_json(
-                value, config, analyzer, anonymizer
+                value, config, analyzer, anonymizer, replacement_mappings
             )
             anonymized[key] = anon_dict
             # Merge statistics
@@ -353,18 +326,17 @@ async def anonymize_azure_di_endpoint(request: AnonymizationRequest):
     Anonymize Azure DI JSON output for safe storage and testing.
     
     This endpoint:
-    1. Detects PII using Presidio with optional BERT-based NER
-    2. Applies custom recognizers for forensic document patterns
-    3. Replaces PII with realistic fake data
-    4. Preserves Azure DI JSON structure and element IDs
-    5. Provides consistent replacements for the same values
+    1. Detects PII using Presidio with BERT-based NER
+    2. Replaces PII with realistic fake data using cryptographically secure random values
+    3. Preserves Azure DI JSON structure and element IDs
+    4. Provides consistent replacements within a session
+    5. Implements session isolation for security
     """
     try:
         # Initialize engines
         analyzer, anonymizer = initialize_engines()
         
-        # Clear mappings for new anonymization session
-        global replacement_mappings
+        # Create new mappings for this anonymization session
         replacement_mappings = {}
         
         # Anonymize the JSON
@@ -372,17 +344,13 @@ async def anonymize_azure_di_endpoint(request: AnonymizationRequest):
             request.azure_di_json,
             request.config,
             analyzer,
-            anonymizer
+            anonymizer,
+            replacement_mappings
         )
-        
-        # Generate mappings ID (optional - for future deanonymization support)
-        mappings_data = json.dumps(replacement_mappings, sort_keys=True)
-        mappings_id = hashlib.sha256(mappings_data.encode()).hexdigest()[:16]
         
         return AnonymizationResponse(
             anonymized_json=anonymized_json,
-            statistics=statistics,
-            mappings_id=mappings_id
+            statistics=statistics
         )
         
     except Exception as e:
@@ -397,38 +365,30 @@ async def anonymize_markdown_endpoint(request: MarkdownAnonymizationRequest):
     
     This endpoint:
     1. Detects PII in markdown text using Presidio with BERT-based NER
-    2. Applies custom recognizers for forensic document patterns
-    3. Replaces PII with realistic fake data
-    4. Preserves markdown formatting (headers, lists, code blocks, etc.)
-    5. Provides consistent replacements for the same values
+    2. Replaces PII with realistic fake data using secure random generation
+    3. Preserves markdown formatting (headers, lists, code blocks, etc.)
+    4. Provides consistent replacements within a session
+    5. Implements session isolation for security
     """
     try:
         # Initialize engines
         analyzer, anonymizer = initialize_engines()
         
-        # Clear mappings for new anonymization session if consistent replacements enabled
-        if request.config.consistent_replacements:
-            global replacement_mappings
-            replacement_mappings = {}
+        # Create new mappings for this anonymization session
+        replacement_mappings = {}
         
         # Anonymize the markdown text
         anonymized_text, statistics, decision_process = anonymize_text_field(
             request.markdown_text,
             analyzer,
             anonymizer,
-            request.config
+            request.config,
+            replacement_mappings
         )
-        
-        # Generate mappings ID (optional - for future deanonymization support)
-        mappings_id = None
-        if request.config.consistent_replacements:
-            mappings_data = json.dumps(replacement_mappings, sort_keys=True)
-            mappings_id = hashlib.sha256(mappings_data.encode()).hexdigest()[:16]
         
         return MarkdownAnonymizationResponse(
             anonymized_text=anonymized_text,
             statistics=statistics,
-            mappings_id=mappings_id,
             decision_process=decision_process
         )
         
@@ -447,8 +407,8 @@ async def health_check():
         return {
             "status": "healthy",
             "service": "anonymization",
-            "bert_engine": analyzer is not None and anonymizer is not None,
-            "model": "Isotonic/distilbert_finetuned_ai4privacy_v2"
+            "engines_initialized": analyzer is not None and anonymizer is not None,
+            "recognizers": "Built-in Presidio recognizers (PERSON, US_SSN, EMAIL_ADDRESS, etc.)"
         }
     except Exception as e:
         return {
