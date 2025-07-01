@@ -62,6 +62,19 @@ class AnonymizationResponse(BaseModel):
     mappings_id: Optional[str] = Field(None, description="ID for retrieving anonymization mappings")
 
 
+class MarkdownAnonymizationRequest(BaseModel):
+    """Request body for markdown anonymization endpoint."""
+    markdown_text: str = Field(..., description="Markdown text to anonymize")
+    config: AnonymizationConfig = Field(default_factory=AnonymizationConfig)
+
+
+class MarkdownAnonymizationResponse(BaseModel):
+    """Response from markdown anonymization endpoint."""
+    anonymized_text: str = Field(..., description="Anonymized markdown text")
+    statistics: Dict[str, int] = Field(..., description="Count of anonymized entities by type")
+    mappings_id: Optional[str] = Field(None, description="ID for retrieving anonymization mappings")
+
+
 # Global engines (initialized on first use)
 analyzer_engine: Optional[AnalyzerEngine] = None
 anonymizer_engine: Optional[AnonymizerEngine] = None
@@ -509,6 +522,55 @@ async def anonymize_azure_di_endpoint(request: AnonymizationRequest):
     except Exception as e:
         logger.error(f"Anonymization failed: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Anonymization failed: {str(e)}")
+
+
+@router.post("/anonymize-markdown", response_model=MarkdownAnonymizationResponse)
+async def anonymize_markdown_endpoint(request: MarkdownAnonymizationRequest):
+    """
+    Anonymize markdown text while preserving formatting.
+    
+    This endpoint:
+    1. Detects PII in markdown text using Presidio with BERT-based NER
+    2. Applies custom recognizers for forensic document patterns
+    3. Replaces PII with realistic fake data
+    4. Preserves markdown formatting (headers, lists, code blocks, etc.)
+    5. Provides consistent replacements for the same values
+    """
+    try:
+        # Initialize engines
+        analyzer, anonymizer = initialize_engines(use_bert=request.config.use_bert_ner)
+        
+        # Clear mappings for new anonymization session if consistent replacements enabled
+        if request.config.consistent_replacements:
+            global replacement_mappings
+            replacement_mappings = {}
+        
+        # Anonymize the markdown text
+        anonymized_text, statistics = anonymize_text_field(
+            request.markdown_text,
+            analyzer,
+            anonymizer,
+            request.config.entity_types,
+            request.config.consistent_replacements,
+            request.config.date_shift_days,
+            request.config.use_bert_ner
+        )
+        
+        # Generate mappings ID (optional - for future deanonymization support)
+        mappings_id = None
+        if request.config.consistent_replacements:
+            mappings_data = json.dumps(replacement_mappings, sort_keys=True)
+            mappings_id = hashlib.sha256(mappings_data.encode()).hexdigest()[:16]
+        
+        return MarkdownAnonymizationResponse(
+            anonymized_text=anonymized_text,
+            statistics=statistics,
+            mappings_id=mappings_id
+        )
+        
+    except Exception as e:
+        logger.error(f"Markdown anonymization failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Markdown anonymization failed: {str(e)}")
 
 
 @router.get("/health")
