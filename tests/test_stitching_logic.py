@@ -751,7 +751,7 @@ class TestValidationFunctions:
 @pytest.fixture
 def real_batch_1_50():
     """Load the real batch_1-50.json fixture."""
-    fixture_path = os.path.join(os.path.dirname(__file__), "fixtures", "batch_1-50.json")
+    fixture_path = os.path.join(os.path.dirname(__file__), "fixtures", "dracula", "batch_1-50.json")
     with open(fixture_path, 'r') as f:
         return json.load(f)
 
@@ -759,7 +759,7 @@ def real_batch_1_50():
 @pytest.fixture
 def real_batch_51_100():
     """Load the real batch_51-100.json fixture."""
-    fixture_path = os.path.join(os.path.dirname(__file__), "fixtures", "batch_51-100.json")
+    fixture_path = os.path.join(os.path.dirname(__file__), "fixtures", "dracula", "batch_51-100.json")
     with open(fixture_path, 'r') as f:
         return json.load(f)
 
@@ -767,7 +767,7 @@ def real_batch_51_100():
 @pytest.fixture
 def real_batch_101_150():
     """Load the real batch_101-150.json fixture."""
-    fixture_path = os.path.join(os.path.dirname(__file__), "fixtures", "batch_101-150.json")
+    fixture_path = os.path.join(os.path.dirname(__file__), "fixtures", "dracula", "batch_101-150.json")
     with open(fixture_path, 'r') as f:
         return json.load(f)
 
@@ -775,7 +775,7 @@ def real_batch_101_150():
 @pytest.fixture
 def ground_truth_result():
     """Load the ground truth result fixture."""
-    fixture_path = os.path.join(os.path.dirname(__file__), "fixtures", "ground_truth_result.json")
+    fixture_path = os.path.join(os.path.dirname(__file__), "fixtures", "dracula", "ground_truth_result.json")
     with open(fixture_path, 'r') as f:
         return json.load(f)
 
@@ -784,7 +784,7 @@ def ground_truth_result():
 @pytest.fixture
 def all_batch_fixtures():
     """Load all 8 batch files in the correct order for full document reconstruction."""
-    fixtures_dir = os.path.join(os.path.dirname(__file__), "fixtures")
+    fixtures_dir = os.path.join(os.path.dirname(__file__), "fixtures", "dracula")
     batch_files = [
         "batch_1-50.json",
         "batch_51-100.json", 
@@ -808,7 +808,7 @@ def all_batch_fixtures():
 @pytest.fixture
 def ground_truth_full():
     """Load the ground truth result fixture."""
-    fixture_path = os.path.join(os.path.dirname(__file__), "fixtures", "ground_truth_result.json")
+    fixture_path = os.path.join(os.path.dirname(__file__), "fixtures", "dracula", "ground_truth_result.json")
     with open(fixture_path, 'r') as f:
         return json.load(f)
 
