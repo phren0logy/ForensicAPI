@@ -24,6 +24,8 @@ dependencies = [
     "pip>=25.1.1",
     "python-dateutil>=2.9.0.post0",
     "llm-guard>=0.3.16",
+    "docling>=2.39.0",
+    "ocrmac>=1.0.0",
 ]
 
 [dependency-groups]
