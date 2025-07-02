@@ -90,6 +90,7 @@ This document outlines the planned improvements to the anonymization endpoints t
    ```
 
 2. Enhance `get_consistent_replacement()` for DATE_TIME:
+
    ```python
    elif entity_type == "DATE_TIME":
        # Parse the original date
@@ -281,4 +282,10 @@ Any code calling the anonymization endpoints must:
 
 This order prioritizes the most impactful fixes first while maintaining system stability throughout the changes.
 
-Planned improvement: Redaction of Bates numbers in Azure DI Layout model Markdown footers
+## Future Enhancements
+
+1. **Deanonymization**: Leverage vault for reversible anonymization with encrypted keys
+2. **Custom Patterns**: Add domain-specific regex patterns
+3. **Multi-language**: Enable Chinese support (already in LLM-Guard)
+4. **Performance**: ONNX optimization for production
+5. **Bates Numbers**: Redaction of Bates numbers in Azure DI Layout model Markdown footers

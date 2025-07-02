@@ -20,6 +20,13 @@ import pytest
 from fastapi.testclient import TestClient
 
 from main import app
+from tests.helpers.azure_di_test_data import (
+    create_azure_di_document,
+    create_paragraph,
+    create_table,
+    create_table_cell,
+    create_simple_document
+)
 from routes.filtering import FilterConfig
 from routes.segmentation import (
     SegmentationInput,
@@ -96,8 +103,8 @@ class TestRealDataSegmentation:
             
             assert response.status_code == 200, f"Failed for {filename}: {response.text}"
             
-            data = response.json()
-            segments = data.get("segments", [])
+            # /segment returns a list directly
+            segments = response.json()
             
             results[filename] = {
                 "segment_count": len(segments),
@@ -420,15 +427,8 @@ class TestSegmentationEdgeCases:
         # Create a document with one extremely long paragraph
         long_content = "This is a test sentence. " * 2000  # ~8000 tokens
         
-        azure_di_json = {
-            "pages": [{
-                "pageNumber": 1,
-                "paragraphs": [{
-                    "content": long_content,
-                    "role": "paragraph"
-                }]
-            }]
-        }
+        # Use helper to create proper Azure DI structure
+        azure_di_json = create_simple_document(long_content)
         
         payload = {
             "source_file": "long_segment.pdf",
@@ -448,6 +448,15 @@ class TestSegmentationEdgeCases:
     def test_empty_document_pages(self, client):
         """Test documents with empty pages."""
         azure_di_json = {
+            "content": "Content on page 2",
+            "paragraphs": [
+                {
+                    "content": "Content on page 2",
+                    "role": "paragraph",
+                    "pageNumber": 2,
+                    "spans": [{"offset": 0, "length": 17}]
+                }
+            ],
             "pages": [
                 {"pageNumber": 1, "paragraphs": []},  # Empty page
                 {
@@ -473,20 +482,25 @@ class TestSegmentationEdgeCases:
     
     def test_complex_table_structures(self, client):
         """Test documents with complex tables."""
-        azure_di_json = {
-            "pages": [{
+        # Create table cells
+        cells = [
+            create_table_cell("Header 1", 0, 0),
+            create_table_cell("Header 2", 0, 1),
+            create_table_cell("Data 1", 1, 0),
+            create_table_cell("Data 2", 1, 1),
+        ]
+        
+        table = create_table(cells)
+        
+        # Create document with table at top level
+        azure_di_json = create_azure_di_document(
+            content="Header 1 Header 2 Data 1 Data 2",
+            tables=[table],
+            pages=[{
                 "pageNumber": 1,
-                "tables": [{
-                    "content": "Table content",
-                    "cells": [
-                        {"content": "Header 1", "rowIndex": 0, "columnIndex": 0},
-                        {"content": "Header 2", "rowIndex": 0, "columnIndex": 1},
-                        {"content": "Data 1", "rowIndex": 1, "columnIndex": 0},
-                        {"content": "Data 2", "rowIndex": 1, "columnIndex": 1},
-                    ]
-                }]
+                "tables": [table]
             }]
-        }
+        )
         
         # Test with different presets to see table handling
         for preset in ["llm_ready", "forensic_extraction"]:
@@ -500,7 +514,8 @@ class TestSegmentationEdgeCases:
             assert response.status_code == 200
             
             # Verify table structure is preserved
-            segments = response.json()
+            data = response.json()
+            segments = data.get("segments", [])
             assert len(segments) > 0
 
 
