@@ -582,6 +582,12 @@ The anonymization endpoints support the following configuration parameters:
   - Default: Basic types like `PERSON`, `DATE_TIME`, `LOCATION`, `PHONE_NUMBER`, `EMAIL_ADDRESS`, `US_SSN`, `MEDICAL_LICENSE`
   - AI4Privacy model supports 54 PII types - leave empty to detect all
   - Note: US_SSN detection requires valid SSN patterns (not test patterns like 123-45-6789)
+- **pattern_sets**: Enable predefined pattern sets (list of strings)
+  - `"legal"`: Bates numbers, case numbers, docket numbers, court filings
+  - `"medical"`: Medical record numbers, insurance IDs, provider numbers
+- **custom_patterns**: Define your own regex patterns (list of pattern objects)
+  - Each pattern needs: `name`, `expressions` (regex list)
+  - Optional: `examples`, `context`, `score`, `languages`
 - **score_threshold**: Minimum confidence score (0.0-1.0, default: 0.5)
   - Higher values reduce false positives but may miss some entities
   - Recommended range: 0.5-0.7
@@ -590,10 +596,6 @@ The anonymization endpoints support the following configuration parameters:
 - **return_decision_process**: Include debugging information about detection reasoning (default: false) - Note: Not currently supported with LLM-Guard
 
 ## Planned Features
-- **Forensic Document Pattern Detection**:
-  - Bates number recognition (e.g., "ABC-123456")
-  - Case number patterns (e.g., "2024-CR-00156")
-  - Medical record numbers (e.g., "MRN: 12345678")
 - **Custom Regex Pattern Support**: Allow users to define domain-specific entity patterns
 - **Multi-language Support**: Currently English-only, planning to add other languages
 - **Batch Processing**: Anonymize multiple documents in a single request
@@ -642,11 +644,33 @@ curl -X POST http://localhost:8000/anonymization/anonymize-azure-di \
     "azure_di_json": '$(cat extracted_result.json | jq .analysis_result)',
     "config": {
       "entity_types": ["PERSON", "EMAIL_ADDRESS", "PHONE_NUMBER", "US_SSN"],
+      "pattern_sets": ["legal", "medical"],  # Enable domain-specific patterns
       "score_threshold": 0.6,
       "anonymize_all_strings": true
     }
   }' \
   > anonymized_result.json
+```
+
+#### Custom Pattern Example
+
+```bash
+# Anonymize with custom patterns
+curl -X POST http://localhost:8000/anonymization/anonymize-markdown \
+  -H "Content-Type: application/json" \
+  -d '{
+    "markdown_text": "Case No. 1:23-cv-45678 references BATES-001234",
+    "config": {
+      "pattern_sets": ["legal"],
+      "custom_patterns": [
+        {
+          "name": "INTERNAL_ID",
+          "expressions": ["\\bID-\\d{8}\\b"],
+          "examples": ["ID-12345678"]
+        }
+      ]
+    }
+  }'
 ```
 
 ### 4. Compose Prompt for LLM

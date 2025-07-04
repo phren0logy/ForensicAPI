@@ -21,6 +21,9 @@ from llm_guard.vault import Vault
 from faker import Faker
 import logging
 
+# Import pattern registry for custom PII patterns
+from .pattern_registry import get_patterns_by_sets, merge_custom_patterns, get_replacement_for_pattern
+
 # Configure logging
 logger = logging.getLogger(__name__)
 
@@ -49,6 +52,8 @@ class AnonymizationConfig(BaseModel):
     # Note: consistent_replacements is now always True for better security and user experience
     score_threshold: float = Field(default=0.5, ge=0.0, le=1.0, description="Minimum confidence score for entity detection")
     return_decision_process: bool = Field(default=False, description="Include detailed detection reasoning")
+    pattern_sets: List[str] = Field(default_factory=list, description="Enable pattern sets: 'legal', 'medical'")
+    custom_patterns: List[Dict[str, Any]] = Field(default_factory=list, description="Custom regex patterns for domain-specific PII")
 
 
 class AnonymizationRequest(BaseModel):
@@ -169,17 +174,56 @@ def create_anonymizer(config: AnonymizationConfig, vault_data: Optional[List[Lis
     vault, date_offset = deserialize_vault(vault_data)
     
     try:
-        # Use AI4Privacy model with 54 PII types
+        # Default entity types used by LLM-Guard when entity_types is None
+        DEFAULT_LLM_GUARD_ENTITIES = [
+            'CREDIT_CARD', 'CRYPTO', 'EMAIL_ADDRESS', 'IBAN_CODE', 
+            'IP_ADDRESS', 'PERSON', 'PHONE_NUMBER', 'US_SSN', 
+            'US_BANK_NUMBER', 'CREDIT_CARD_RE', 'UUID', 
+            'EMAIL_ADDRESS_RE', 'US_SSN_RE'
+        ]
+        
+        # Get custom patterns if specified
+        regex_patterns = None
+        all_entity_types = config.entity_types
+        
+        if config.pattern_sets or config.custom_patterns:
+            builtin_patterns = get_patterns_by_sets(config.pattern_sets)
+            regex_patterns = merge_custom_patterns(builtin_patterns, config.custom_patterns)
+            
+            # Extract custom entity types from patterns
+            custom_entity_types = [p["name"] for p in regex_patterns]
+            
+            # Handle entity types configuration
+            if config.entity_types is None:
+                # If None, we want to use defaults + custom
+                all_entity_types = DEFAULT_LLM_GUARD_ENTITIES + custom_entity_types
+            elif len(config.entity_types) == 0:
+                # If empty list, user wants ONLY custom patterns
+                all_entity_types = custom_entity_types
+            else:
+                # If specific types listed, merge with custom types
+                all_entity_types = list(set(config.entity_types + custom_entity_types))
+        
+        # Use AI4Privacy model with 54 PII types + custom patterns
         scanner = Anonymize(
             vault=vault,
             recognizer_conf=DISTILBERT_AI4PRIVACY_v2_CONF,
             threshold=config.score_threshold,
             use_faker=True,  # Enable Faker for all entities (Note: limits consistency with vault)
-            entity_types=config.entity_types if config.entity_types else None,
+            entity_types=all_entity_types,
+            regex_patterns=regex_patterns,  # Add custom regex patterns
             language="en"
         )
         
         logger.info("✅ LLM-Guard scanner created with AI4Privacy model")
+        if regex_patterns:
+            logger.info(f"✅ Added {len(regex_patterns)} custom regex patterns")
+            for pattern in regex_patterns:
+                logger.debug(f"  - Pattern: {pattern['name']} with expressions: {pattern['expressions']}")
+        if all_entity_types:
+            logger.info(f"✅ Using entity types: {all_entity_types}")
+        else:
+            logger.info("✅ Using all default entity types + custom patterns")
         return scanner, vault, date_offset
         
     except Exception as e:
@@ -254,7 +298,13 @@ def get_consistent_replacement(entity_type: str, original_value: str,
         # Use cryptographically secure random for medical licenses
         replacement = f"MD{secrets.randbelow(999999):06d}"
     else:
-        replacement = f"[REDACTED_{entity_type}]"
+        # Check if this is a custom pattern type
+        custom_replacement = get_replacement_for_pattern(entity_type, original_value)
+        if custom_replacement != f"[REDACTED_{entity_type}]":
+            replacement = custom_replacement
+        else:
+            # Default for unknown types
+            replacement = f"[REDACTED_{entity_type}]"
     
     # Store for consistency
     replacement_mappings[entity_type][original_value] = replacement
@@ -392,7 +442,15 @@ def deanonymize_text_with_vault(text: str, vault_data: List[List[str]]) -> tuple
             result = result.replace(placeholder, original)
             
             # Infer entity type for statistics
-            if '@' in placeholder:
+            # Check if it's a custom entity type with pattern [REDACTED_ENTITY_TYPE_N]
+            if placeholder.startswith('[REDACTED_') and placeholder.endswith(']'):
+                # Extract entity type from pattern like [REDACTED_BATES_NUMBER_1]
+                parts = placeholder[10:-1].rsplit('_', 1)  # Remove [REDACTED_ and ], split from right
+                if len(parts) == 2 and parts[1].isdigit():
+                    entity_type = parts[0]
+                else:
+                    entity_type = 'OTHER'
+            elif '@' in placeholder:
                 entity_type = 'EMAIL_ADDRESS'
             elif len(placeholder) == 11 and placeholder[3] == '-' and placeholder[6] == '-':
                 entity_type = 'US_SSN'
@@ -422,8 +480,16 @@ def extract_statistics_from_vault(vault: Vault) -> Dict[str, int]:
     stats = {}
     
     for replacement, original in vault.get():
-        # Infer entity type from replacement pattern
-        if '@' in replacement:
+        # Check if it's a custom entity type with pattern [REDACTED_ENTITY_TYPE_N]
+        if replacement.startswith('[REDACTED_') and replacement.endswith(']'):
+            # Extract entity type from pattern like [REDACTED_BATES_NUMBER_1]
+            parts = replacement[10:-1].rsplit('_', 1)  # Remove [REDACTED_ and ], split from right
+            if len(parts) == 2 and parts[1].isdigit():
+                entity_type = parts[0]
+            else:
+                entity_type = 'OTHER'
+        # Infer standard entity types from replacement pattern
+        elif '@' in replacement:
             entity_type = 'EMAIL_ADDRESS'
         elif len(replacement) == 11 and replacement[3] == '-' and replacement[6] == '-':
             entity_type = 'US_SSN'

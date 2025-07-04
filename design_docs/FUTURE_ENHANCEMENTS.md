@@ -2,12 +2,13 @@
 
 This document serves as a living reference for all planned and possible future enhancements to the ForensicAPI document processing system. It consolidates unimplemented features from previous design documents and tracks new enhancement ideas.
 
-**Note**: The system has already migrated from Presidio to LLM-Guard for anonymization, providing 54 PII types detection with the AI4Privacy BERT model. In the future, consider using https://huggingface.co/dslim/distilbert-NER
+**Note**: The system uses LLM-Guard for anonymization, providing 54 PII types detection with the AI4Privacy BERT model. In the future, consider using https://huggingface.co/dslim/distilbert-NER
 
 **Completed Features**:
 
 - Stateless deanonymization and pseudonymization endpoints with vault serialization
 - Date offset storage in vault for consistent temporal shifts across documents
+- Legal and Forensic Pattern Detection with format-preserving replacements
 
 ## Table of Contents
 
@@ -19,34 +20,7 @@ This document serves as a living reference for all planned and possible future e
 
 ## Anonymization Enhancements
 
-### 1. Multi-language Support
-
-**Priority**: Medium | **Complexity**: Low
-
-Extend anonymization to support multiple languages beyond English.
-
-**Features**:
-
-- Enable Chinese detection (already available in LLM-Guard)
-- Add language auto-detection
-- Support mixed-language documents
-- Configure language-specific PII patterns
-
-### 2. Custom PII Pattern Support
-
-**Priority**: Low | **Complexity**: Low
-
-Add ability to define domain-specific regex patterns for specialized PII types.
-
-**Use Cases**:
-
-- Case numbers in specific formats
-- Bates numbers
-- Medical record IDs
-- Custom identifiers
-- Industry-specific codes
-
-### 3. Vault Persistence
+### 1. Vault Persistence
 
 **Priority**: Low | **Complexity**: Medium
 
@@ -59,7 +33,7 @@ Implement optional Redis backend for maintaining consistent anonymization across
 - Optional feature flag
 - Useful for multi-step document processing
 
-### 4. Batch Anonymization
+### 2. Batch Anonymization
 
 **Priority**: Low | **Complexity**: Medium
 
@@ -71,20 +45,6 @@ Process multiple documents efficiently with shared model loading and parallel pr
 - Share model across documents
 - Parallel processing with asyncio
 - Aggregate statistics
-
-### 5. Bates Numbers and Case Numbers Redaction
-
-**Priority**: Medium | **Complexity**: Low
-
-Special handling for Bates numbers and case numbers in documents, particularly in Azure DI Layout model Markdown footers.
-
-**Features**:
-
-- Detect common Bates number patterns (e.g., "BATES-001234", "DEF00012345")
-- Detect case number patterns (e.g., "Case No. 1:23-cv-45678", "Docket No. 12-3456")
-- Option to redact or preserve based on configuration
-- Maintain document structure and readability
-- Custom pattern configuration support
 
 ## Document Processing Enhancements
 
@@ -305,9 +265,7 @@ Implement load testing for production readiness.
 ### Phase 2: Enhancement Features (2-3 months)
 
 1. Model Optimization
-2. Multi-language Support
-3. Environment Configuration
-4. Bates Numbers and Case Numbers Redaction
+2. Environment Configuration
 
 ### Phase 3: Performance & Scale (3-4 months)
 
@@ -321,7 +279,7 @@ Implement load testing for production readiness.
 1. Streaming Processing
 2. GPU Acceleration
 3. Monitoring and Metrics
-4. Custom PII Patterns
+4. Vault Persistence
 
 ## Notes
 

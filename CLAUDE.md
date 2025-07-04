@@ -16,6 +16,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Date offset stored in vault for consistent temporal shifts
 - See `examples/pseudonymization_demo.py` for usage patterns
 
+### Legal and Forensic Pattern Detection (2025-01-04)
+- Custom regex patterns for domain-specific PII detection
+- Predefined pattern sets: `legal` (Bates, case numbers) and `medical` (MRN, insurance)
+- Support for custom patterns via API
+- Format-preserving replacements maintain document structure
+- See `examples/custom_patterns_demo.py` for usage patterns
+
 ## Project Overview
 
 FastAPI-based document processing API focused on handling large PDF documents using Azure Document Intelligence. The project implements a sophisticated 2-phase processing pipeline for perfect document reconstruction and intelligent segmentation.
