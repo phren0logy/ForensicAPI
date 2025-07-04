@@ -71,6 +71,11 @@ LOG_LEVEL=INFO
 - **[UV](https://github.com/astral-sh/uv)**: Ultra-fast Python package and project management
 - **Python 3.13+**: Required for latest performance improvements and type hints
 
+### Examples
+
+Example scripts are provided in the `examples/` directory:
+- `pseudonymization_demo.py`: Demonstrates stateless pseudonymization and deanonymization workflows
+
 ### Running the Server
 
 To start the FastAPI server:
@@ -354,7 +359,7 @@ uv run run.py
 
 ### `/anonymization/anonymize-azure-di` (POST)
 
-- **Description:** Anonymizes sensitive information in Azure Document Intelligence output using LLM-Guard with the AI4Privacy BERT model. This is currently "one-way" in that de-anonymization is not presently supported.
+- **Description:** Anonymizes sensitive information in Azure Document Intelligence output using LLM-Guard with the AI4Privacy BERT model. Supports stateless operation by accepting and returning vault data for consistent anonymization across requests.
 - **Request:**
   - A JSON object with the following structure:
     ```json
@@ -376,7 +381,11 @@ uv run run.py
         "anonymize_all_strings": true,
         "date_shift_days": 365,
         "return_decision_process": false
-      }
+      },
+      "vault_data": [  /* Optional: Previous vault data for consistent replacements */
+        ["John Doe", "Jane Smith"],
+        ["_date_offset", "-365"]
+      ]
     }
     ```
 - **Features:**
@@ -403,13 +412,18 @@ uv run run.py
     ```json
     {
       "anonymized_json": { /* Anonymized Azure DI JSON */ },
-      "statistics": { "PERSON": 5, "DATE_TIME": 2, ... }
+      "statistics": { "PERSON": 5, "DATE_TIME": 2, ... },
+      "vault_data": [  /* Updated vault with all anonymization mappings */
+        ["John Doe", "Jane Smith"],
+        ["john@example.com", "jane@example.com"],
+        ["_date_offset", "-365"]
+      ]
     }
     ```
 
 ### `/anonymization/anonymize-markdown` (POST)
 
-- **Description:** Anonymizes sensitive information in markdown or plain text while preserving formatting.
+- **Description:** Anonymizes sensitive information in markdown or plain text while preserving formatting. Supports stateless operation with vault data.
 - **Request:**
   - A JSON object with the following structure:
     ```json
@@ -420,7 +434,10 @@ uv run run.py
         "score_threshold": 0.5,
         "anonymize_all_strings": true,
         "return_decision_process": false
-      }
+      },
+      "vault_data": [  /* Optional: Previous vault data */
+        ["placeholder", "original"], ...
+      ]
     }
     ```
 - **Features:**
@@ -435,7 +452,8 @@ uv run run.py
     {
       "anonymized_text": "Anonymized markdown content...",
       "statistics": { "PERSON": 3, "EMAIL_ADDRESS": 2, ... },
-      "decision_process": [ /* optional debugging info */ ]
+      "decision_process": [ /* optional debugging info */ ],
+      "vault_data": [ /* Updated vault data */ ]
     }
     ```
 
@@ -454,6 +472,47 @@ uv run run.py
     }
     ```
   - Returns `"status": "unhealthy"` with error details if the service is not ready.
+
+### `/anonymization/pseudonymize` (POST)
+
+- **Description:** Pseudonymize text with consistent replacements designed for reversibility. Uses vault state for maintaining mappings across multiple documents.
+- **Request:**
+  ```json
+  {
+    "text": "Text to pseudonymize",
+    "config": {
+      "entity_types": ["PERSON", "EMAIL_ADDRESS", ...],
+      "date_shift_days": 365
+    },
+    "vault_data": [ /* Optional: Previous vault data */ ]
+  }
+  ```
+- **Response:**
+  ```json
+  {
+    "pseudonymized_text": "Text with consistent pseudonyms",
+    "statistics": { "PERSON": 2, ... },
+    "vault_data": [ /* Updated vault with all mappings */ ]
+  }
+  ```
+
+### `/anonymization/deanonymize` (POST)
+
+- **Description:** Reverse pseudonymization using vault mappings to restore original values.
+- **Request:**
+  ```json
+  {
+    "text": "Pseudonymized text",
+    "vault_data": [ /* Required: Vault data from pseudonymization */ ]
+  }
+  ```
+- **Response:**
+  ```json
+  {
+    "deanonymized_text": "Original text restored",
+    "statistics": { "PERSON": 2, ... }
+  }
+  ```
 
 ## Element ID System
 
@@ -531,10 +590,6 @@ The anonymization endpoints support the following configuration parameters:
 - **return_decision_process**: Include debugging information about detection reasoning (default: false) - Note: Not currently supported with LLM-Guard
 
 ## Planned Features
-
-- **Deanonymization Support**: 
-  - Leverage LLM-Guard's vault system for reversible anonymization
-  - Stateless deanonymization with encrypted keys
 - **Forensic Document Pattern Detection**:
   - Bates number recognition (e.g., "ABC-123456")
   - Case number patterns (e.g., "2024-CR-00156")

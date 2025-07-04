@@ -10,6 +10,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - IDs are preserved through filtering and segmentation
 - The `include_element_ids` parameter (default: true) controls ID generation
 
+### Stateless Pseudonymization (2025-01-04)
+- All anonymization endpoints now support stateless operation via `vault_data`
+- New `/anonymization/pseudonymize` and `/anonymization/deanonymize` endpoints
+- Date offset stored in vault for consistent temporal shifts
+- See `examples/pseudonymization_demo.py` for usage patterns
+
 ## Project Overview
 
 FastAPI-based document processing API focused on handling large PDF documents using Azure Document Intelligence. The project implements a sophisticated 2-phase processing pipeline for perfect document reconstruction and intelligent segmentation.
@@ -38,7 +44,10 @@ FastAPI-based document processing API focused on handling large PDF documents us
 - `/extract` - PDF to structured data extraction (now with element IDs)
 - `/segment` - Document segmentation with token control
 - `/segment-filtered` - Combined filtering and segmentation for LLM processing
-- `/anonymization/anonymize-azure-di` - PII detection and anonymization
+- `/anonymization/anonymize-azure-di` - PII detection and anonymization (now stateless)
+- `/anonymization/anonymize-markdown` - Markdown text anonymization (now stateless)
+- `/anonymization/pseudonymize` - Reversible pseudonymization with vault state
+- `/anonymization/deanonymize` - Restore original values from pseudonymized text
 - `/health` - Health check endpoint
 
 ## Development Commands
@@ -85,6 +94,9 @@ uv run python scripts/generate_test_fixtures.py
 
 # Quick testing
 uv run python tests/quick_test.py
+
+# Example scripts
+uv run python examples/pseudonymization_demo.py
 ```
 
 ### Built-in Test Pages

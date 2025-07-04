@@ -4,6 +4,11 @@ This document serves as a living reference for all planned and possible future e
 
 **Note**: The system has already migrated from Presidio to LLM-Guard for anonymization, providing 54 PII types detection with the AI4Privacy BERT model. In the future, consider using https://huggingface.co/dslim/distilbert-NER
 
+**Completed Features**:
+
+- Stateless deanonymization and pseudonymization endpoints with vault serialization
+- Date offset storage in vault for consistent temporal shifts across documents
+
 ## Table of Contents
 
 1. [Anonymization Enhancements](#anonymization-enhancements)
@@ -14,48 +19,7 @@ This document serves as a living reference for all planned and possible future e
 
 ## Anonymization Enhancements
 
-### 1. Stateless Deanonymization with Encrypted Keys
-
-**Priority**: High | **Complexity**: Medium
-
-Enable reversible anonymization without server-side storage by encrypting the anonymization mappings and returning them as a "deanonymization key".
-
-**Technical Approach**:
-
-- Serialize LLM-Guard's Vault containing all replacement mappings
-- Encrypt using AES-256-GCM with server-side secret
-- Return encrypted blob as base64-encoded key
-- Implement `/deanonymize` endpoint that accepts the key
-
-**Implementation Details**:
-
-```python
-class DeanonymizationKey:
-    def create_key(self, vault: Vault, date_shift: Optional[int]) -> str:
-        """Create encrypted deanonymization key."""
-        data = {
-            "mappings": vault.get_all_mappings(),
-            "date_shift": date_shift,
-            "version": 1
-        }
-
-        # Serialize with msgpack (more compact than JSON)
-        serialized = msgpack.packb(data)
-
-        # Encrypt with server secret
-        encrypted = self.cipher.encrypt(serialized)
-
-        return base64.urlsafe_b64encode(encrypted).decode()
-```
-
-**Benefits**:
-
-- Completely stateless operation
-- Keys can be stored anywhere (client-side, S3, etc.)
-- Secure with proper encryption
-- Optional time-limited keys possible
-
-### 2. Multi-language Support
+### 1. Multi-language Support
 
 **Priority**: Medium | **Complexity**: Low
 
@@ -68,7 +32,7 @@ Extend anonymization to support multiple languages beyond English.
 - Support mixed-language documents
 - Configure language-specific PII patterns
 
-### 3. Custom PII Pattern Support
+### 2. Custom PII Pattern Support
 
 **Priority**: Low | **Complexity**: Low
 
@@ -82,7 +46,7 @@ Add ability to define domain-specific regex patterns for specialized PII types.
 - Custom identifiers
 - Industry-specific codes
 
-### 4. Vault Persistence
+### 3. Vault Persistence
 
 **Priority**: Low | **Complexity**: Medium
 
@@ -95,7 +59,7 @@ Implement optional Redis backend for maintaining consistent anonymization across
 - Optional feature flag
 - Useful for multi-step document processing
 
-### 5. Batch Anonymization
+### 4. Batch Anonymization
 
 **Priority**: Low | **Complexity**: Medium
 
@@ -108,7 +72,7 @@ Process multiple documents efficiently with shared model loading and parallel pr
 - Parallel processing with asyncio
 - Aggregate statistics
 
-### 6. Bates Numbers and Case Numbers Redaction
+### 5. Bates Numbers and Case Numbers Redaction
 
 **Priority**: Medium | **Complexity**: Low
 
@@ -337,7 +301,6 @@ Implement load testing for production readiness.
 
 1. Azure DI Format Conversion
 2. Element ID Integration for Docling
-3. Stateless Deanonymization
 
 ### Phase 2: Enhancement Features (2-3 months)
 

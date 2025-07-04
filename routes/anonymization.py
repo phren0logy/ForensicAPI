@@ -55,18 +55,21 @@ class AnonymizationRequest(BaseModel):
     """Request body for anonymization endpoint."""
     azure_di_json: Dict[str, Any] = Field(..., description="Raw Azure DI extraction output")
     config: AnonymizationConfig = Field(default_factory=AnonymizationConfig)
+    vault_data: Optional[List[List[str]]] = Field(None, description="Previous vault data for consistent anonymization across requests")
 
 
 class AnonymizationResponse(BaseModel):
     """Response from anonymization endpoint."""
     anonymized_json: Dict[str, Any] = Field(..., description="Anonymized Azure DI JSON")
     statistics: Dict[str, int] = Field(..., description="Count of anonymized entities by type")
+    vault_data: List[List[str]] = Field(..., description="Vault data containing anonymization mappings for stateless operation")
 
 
 class MarkdownAnonymizationRequest(BaseModel):
     """Request body for markdown anonymization endpoint."""
     markdown_text: str = Field(..., description="Markdown text to anonymize")
     config: AnonymizationConfig = Field(default_factory=AnonymizationConfig)
+    vault_data: Optional[List[List[str]]] = Field(None, description="Previous vault data for consistent anonymization across requests")
 
 
 class MarkdownAnonymizationResponse(BaseModel):
@@ -74,6 +77,33 @@ class MarkdownAnonymizationResponse(BaseModel):
     anonymized_text: str = Field(..., description="Anonymized markdown text")
     statistics: Dict[str, int] = Field(..., description="Count of anonymized entities by type")
     decision_process: Optional[List[Dict]] = Field(None, description="Detection reasoning if requested")
+    vault_data: List[List[str]] = Field(..., description="Vault data containing anonymization mappings for stateless operation")
+
+
+class PseudonymizationRequest(BaseModel):
+    """Request body for pseudonymization endpoint."""
+    text: str = Field(..., description="Text to pseudonymize")
+    vault_data: Optional[List[List[str]]] = Field(None, description="Previous vault data for consistent pseudonymization across documents")
+    config: AnonymizationConfig = Field(default_factory=AnonymizationConfig)
+
+
+class PseudonymizationResponse(BaseModel):
+    """Response from pseudonymization endpoint."""
+    pseudonymized_text: str = Field(..., description="Pseudonymized text")
+    statistics: Dict[str, int] = Field(..., description="Count of pseudonymized entities by type")
+    vault_data: List[List[str]] = Field(..., description="Updated vault data with all mappings")
+
+
+class DeanonymizationRequest(BaseModel):
+    """Request body for deanonymization endpoint."""
+    text: str = Field(..., description="Text to deanonymize")
+    vault_data: List[List[str]] = Field(..., description="Vault data containing anonymization mappings")
+
+
+class DeanonymizationResponse(BaseModel):
+    """Response from deanonymization endpoint."""
+    deanonymized_text: str = Field(..., description="Deanonymized text with original values restored")
+    statistics: Dict[str, int] = Field(..., description="Count of deanonymized entities by type")
 
 
 # Global scanner (initialized on first use)
@@ -81,13 +111,62 @@ class MarkdownAnonymizationResponse(BaseModel):
 global_scanner: Optional[Anonymize] = None
 
 
+def serialize_vault(vault: Vault, date_offset: Optional[int] = None) -> List[List[str]]:
+    """Serialize vault to list of [placeholder, original] pairs with optional metadata."""
+    data = []
+    
+    # Add date offset as metadata if provided
+    if date_offset is not None:
+        data.append(["_date_offset", str(date_offset)])
+    
+    # Add all vault entries
+    for placeholder, original in vault.get():
+        data.append([placeholder, original])
+    
+    return data
 
-def create_anonymizer(config: AnonymizationConfig) -> tuple[Anonymize, Vault]:
+
+def deserialize_vault(vault_data: Optional[List[List[str]]]) -> tuple[Vault, Optional[int]]:
+    """Deserialize vault data and extract metadata.
+    
+    Returns:
+        tuple: (vault, date_offset)
+    """
+    vault = Vault()
+    date_offset = None
+    
+    if not vault_data:
+        return vault, date_offset
+    
+    for entry in vault_data:
+        if len(entry) != 2:
+            continue
+            
+        placeholder, original = entry
+        
+        # Handle metadata entries
+        if placeholder == "_date_offset":
+            try:
+                date_offset = int(original)
+            except ValueError:
+                logger.warning(f"Invalid date offset value: {original}")
+        else:
+            # Regular vault entry
+            vault.append((placeholder, original))
+    
+    return vault, date_offset
+
+
+
+def create_anonymizer(config: AnonymizationConfig, vault_data: Optional[List[List[str]]] = None) -> tuple[Anonymize, Vault, Optional[int]]:
     """Create LLM-Guard anonymizer with AI4Privacy model.
     
-    Returns a new scanner and vault for session isolation.
+    Returns a new scanner, vault, and date_offset for session isolation.
+    If vault_data is provided, initializes vault with previous anonymization mappings
+    and extracts any metadata like date_offset.
     """
-    vault = Vault()  # New vault per request for session isolation
+    # Deserialize vault data if provided
+    vault, date_offset = deserialize_vault(vault_data)
     
     try:
         # Use AI4Privacy model with 54 PII types
@@ -95,13 +174,13 @@ def create_anonymizer(config: AnonymizationConfig) -> tuple[Anonymize, Vault]:
             vault=vault,
             recognizer_conf=DISTILBERT_AI4PRIVACY_v2_CONF,
             threshold=config.score_threshold,
-            use_faker=True,  # Enable Faker for all entities
+            use_faker=True,  # Enable Faker for all entities (Note: limits consistency with vault)
             entity_types=config.entity_types if config.entity_types else None,
             language="en"
         )
         
         logger.info("✅ LLM-Guard scanner created with AI4Privacy model")
-        return scanner, vault
+        return scanner, vault, date_offset
         
     except Exception as e:
         logger.error(f"Failed to create LLM-Guard scanner: {str(e)}")
@@ -182,12 +261,22 @@ def get_consistent_replacement(entity_type: str, original_value: str,
     return replacement
 
 
-def generate_session_shift(date_shift_days: int) -> int:
-    """Generate a random date shift for the session."""
-    # Add some noise to the shift range for better security
-    noise_factor = random.uniform(0.8, 1.2)
-    adjusted_days = int(date_shift_days * noise_factor)
-    return random.randint(-adjusted_days, adjusted_days)
+def generate_session_shift(date_shift_days: int, existing_offset: Optional[int] = None) -> int:
+    """Generate or return existing date shift for the session.
+    
+    Args:
+        date_shift_days: Maximum days to shift dates
+        existing_offset: Previously generated offset from vault
+        
+    Returns:
+        Date offset in days (positive or negative)
+    """
+    if existing_offset is not None:
+        return existing_offset
+        
+    # Generate new offset without noise for consistency
+    # Use a fixed range for predictable behavior
+    return random.randint(-date_shift_days, date_shift_days)
 
 
 def extract_date_entities_from_vault(vault: Vault) -> List[tuple[str, str]]:
@@ -267,6 +356,61 @@ def update_vault_with_shifted_dates(vault: Vault, date_entities: List[tuple[str,
             
         except Exception as e:
             logger.warning(f"Could not update vault for date '{original_date}': {e}")
+
+
+
+def deanonymize_text_with_vault(text: str, vault_data: List[List[str]]) -> tuple[str, Dict[str, int]]:
+    """Deanonymize text using vault mappings.
+    
+    Args:
+        text: Text containing pseudonymized values
+        vault_data: Vault data with [placeholder, original] mappings
+        
+    Returns:
+        tuple: (deanonymized_text, statistics)
+    """
+    result = text
+    statistics = {}
+    
+    # Sort by placeholder length (descending) to avoid partial replacements
+    sorted_mappings = sorted(vault_data, key=lambda x: len(x[0]) if len(x) == 2 else 0, reverse=True)
+    
+    for mapping in sorted_mappings:
+        if len(mapping) != 2:
+            continue
+            
+        placeholder, original = mapping
+        
+        # Skip metadata entries
+        if placeholder.startswith("_"):
+            continue
+            
+        # Count occurrences before replacement
+        count = result.count(placeholder)
+        if count > 0:
+            # Replace all occurrences
+            result = result.replace(placeholder, original)
+            
+            # Infer entity type for statistics
+            if '@' in placeholder:
+                entity_type = 'EMAIL_ADDRESS'
+            elif len(placeholder) == 11 and placeholder[3] == '-' and placeholder[6] == '-':
+                entity_type = 'US_SSN'
+            elif len(placeholder) == 10 and placeholder.count('-') == 2:
+                entity_type = 'DATE_TIME'
+            elif placeholder.replace('-', '').replace(' ', '').replace('(', '').replace(')', '').isdigit() and len(placeholder) >= 10:
+                entity_type = 'PHONE_NUMBER'
+            else:
+                # Check if it looks like a name
+                words = placeholder.split()
+                if len(words) >= 2 and all(w[0].isupper() for w in words if w):
+                    entity_type = 'PERSON'
+                else:
+                    entity_type = 'OTHER'
+            
+            statistics[entity_type] = statistics.get(entity_type, 0) + count
+    
+    return result, statistics
 
 
 def extract_statistics_from_vault(vault: Vault) -> Dict[str, int]:
@@ -421,15 +565,16 @@ async def anonymize_azure_di_endpoint(request: AnonymizationRequest):
     3. Preserves Azure DI JSON structure and element IDs
     4. Provides consistent replacements within a session
     5. Implements session isolation for security
+    6. Supports stateless operation by accepting/returning vault data
     """
     try:
-        # Create new scanner for session isolation
-        scanner, vault = create_anonymizer(request.config)
+        # Create scanner with optional vault data for stateless operation
+        scanner, vault, existing_date_offset = create_anonymizer(request.config, request.vault_data)
         
-        # Generate session-wide date shift if enabled
+        # Generate or use existing date shift if enabled
         date_shift = None
         if request.config.date_shift_days:
-            date_shift = generate_session_shift(request.config.date_shift_days)
+            date_shift = generate_session_shift(request.config.date_shift_days, existing_date_offset)
         
         # Anonymize the JSON
         anonymized_json, statistics = anonymize_azure_di_json(
@@ -442,7 +587,8 @@ async def anonymize_azure_di_endpoint(request: AnonymizationRequest):
         
         return AnonymizationResponse(
             anonymized_json=anonymized_json,
-            statistics=statistics
+            statistics=statistics,
+            vault_data=serialize_vault(vault, date_shift)
         )
         
     except Exception as e:
@@ -461,15 +607,16 @@ async def anonymize_markdown_endpoint(request: MarkdownAnonymizationRequest):
     3. Preserves markdown formatting (headers, lists, code blocks, etc.)
     4. Provides consistent replacements within a session
     5. Implements session isolation for security
+    6. Supports stateless operation by accepting/returning vault data
     """
     try:
-        # Create new scanner for session isolation
-        scanner, vault = create_anonymizer(request.config)
+        # Create scanner with optional vault data for stateless operation
+        scanner, vault, existing_date_offset = create_anonymizer(request.config, request.vault_data)
         
-        # Generate date shift if enabled
+        # Generate or use existing date shift if enabled
         date_shift = None
         if request.config.date_shift_days:
-            date_shift = generate_session_shift(request.config.date_shift_days)
+            date_shift = generate_session_shift(request.config.date_shift_days, existing_date_offset)
         
         # Anonymize the markdown text
         anonymized_text, statistics, decision_process = anonymize_text_with_date_shift(
@@ -483,12 +630,86 @@ async def anonymize_markdown_endpoint(request: MarkdownAnonymizationRequest):
         return MarkdownAnonymizationResponse(
             anonymized_text=anonymized_text,
             statistics=statistics,
-            decision_process=decision_process
+            decision_process=decision_process,
+            vault_data=serialize_vault(vault, date_shift)
         )
         
     except Exception as e:
         logger.error(f"Markdown anonymization failed: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Markdown anonymization failed: {str(e)}")
+
+
+@router.post("/pseudonymize", response_model=PseudonymizationResponse)
+async def pseudonymize_endpoint(request: PseudonymizationRequest):
+    """
+    Pseudonymize text with consistent replacements across documents.
+    
+    This endpoint:
+    1. Detects PII using LLM-Guard with AI4Privacy BERT model
+    2. Replaces PII with consistent pseudonyms
+    3. Maintains vault data for reversibility and consistency
+    4. Supports stateless operation by accepting/returning vault data
+    
+    The difference from anonymization is that this is designed for reversibility
+    and maintaining consistent replacements across multiple documents.
+    """
+    try:
+        # Create scanner with optional vault data for stateless operation
+        scanner, vault, existing_date_offset = create_anonymizer(request.config, request.vault_data)
+        
+        # Generate or use existing date shift if enabled
+        date_shift = None
+        if request.config.date_shift_days:
+            date_shift = generate_session_shift(request.config.date_shift_days, existing_date_offset)
+        
+        # Pseudonymize the text
+        pseudonymized_text, statistics, _ = anonymize_text_with_date_shift(
+            request.text,
+            scanner,
+            vault,
+            request.config,
+            date_shift
+        )
+        
+        return PseudonymizationResponse(
+            pseudonymized_text=pseudonymized_text,
+            statistics=statistics,
+            vault_data=serialize_vault(vault, date_shift)
+        )
+        
+    except Exception as e:
+        logger.error(f"Pseudonymization failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Pseudonymization failed: {str(e)}")
+
+
+@router.post("/deanonymize", response_model=DeanonymizationResponse)
+async def deanonymize_endpoint(request: DeanonymizationRequest):
+    """
+    Deanonymize text using vault mappings.
+    
+    This endpoint:
+    1. Reverses pseudonymization using vault data
+    2. Restores original values from pseudonyms
+    3. Provides statistics on deanonymized entities
+    
+    Note: This only works with text that was pseudonymized using the
+    /pseudonymize endpoint with the same vault data.
+    """
+    try:
+        # Deanonymize using vault mappings
+        deanonymized_text, statistics = deanonymize_text_with_vault(
+            request.text,
+            request.vault_data
+        )
+        
+        return DeanonymizationResponse(
+            deanonymized_text=deanonymized_text,
+            statistics=statistics
+        )
+        
+    except Exception as e:
+        logger.error(f"Deanonymization failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Deanonymization failed: {str(e)}")
 
 
 @router.get("/health")
@@ -497,7 +718,7 @@ async def health_check():
     try:
         # Test scanner creation with default config
         test_config = AnonymizationConfig()
-        scanner, vault = create_anonymizer(test_config)
+        scanner, vault, _ = create_anonymizer(test_config)
         
         return {
             "status": "healthy",
