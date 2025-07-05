@@ -12,43 +12,23 @@
       "words": [
         {
           "content": "J",
-          "boundingBox": [
-            100,
-            200,
-            110,
-            220
-          ],
+          "boundingBox": [100, 200, 110, 220],
           "confidence": 0.65
         },
         {
           "content": "Sm",
-          "boundingBox": [
-            200,
-            200,
-            220,
-            220
-          ],
+          "boundingBox": [200, 200, 220, 220],
           "confidence": 0.7
         }
       ],
       "lines": [
         {
           "content": "Name: J\u2588\u2588\u2588\u2588\u2588 Sm\u2588\u2588\u2588",
-          "boundingBox": [
-            100,
-            200,
-            300,
-            220
-          ]
+          "boundingBox": [100, 200, 300, 220]
         },
         {
           "content": "ID: \u2588\u2588\u2588-\u2588\u2588-4567",
-          "boundingBox": [
-            100,
-            240,
-            300,
-            260
-          ]
+          "boundingBox": [100, 240, 300, 260]
         }
       ]
     }

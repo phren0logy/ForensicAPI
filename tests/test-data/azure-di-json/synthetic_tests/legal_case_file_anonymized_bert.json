@@ -12,61 +12,31 @@
       "words": [
         {
           "content": "3019-CR-3575",
-          "boundingBox": [
-            200,
-            150,
-            350,
-            170
-          ],
+          "boundingBox": [200, 150, 350, 170],
           "confidence": 0.99
         },
         {
           "content": "ANON-436960",
-          "boundingBox": [
-            100,
-            800,
-            250,
-            820
-          ],
+          "boundingBox": [100, 800, 250, 820],
           "confidence": 0.99
         }
       ],
       "lines": [
         {
           "content": "3019-CR-3575: 3019-CR-3575",
-          "boundingBox": [
-            100,
-            150,
-            350,
-            170
-          ]
+          "boundingBox": [100, 150, 350, 170]
         },
         {
           "content": "ROBERT WILLIAMS",
-          "boundingBox": [
-            100,
-            250,
-            300,
-            270
-          ]
+          "boundingBox": [100, 250, 300, 270]
         },
         {
           "content": "Attorney: Jennifer Martinez, Esq.",
-          "boundingBox": [
-            100,
-            400,
-            400,
-            420
-          ]
+          "boundingBox": [100, 400, 400, 420]
         },
         {
           "content": "ANON-436960",
-          "boundingBox": [
-            100,
-            800,
-            250,
-            820
-          ]
+          "boundingBox": [100, 800, 250, 820]
         }
       ]
     },
@@ -79,12 +49,7 @@
       "lines": [
         {
           "content": "ANON-675009",
-          "boundingBox": [
-            100,
-            800,
-            250,
-            820
-          ]
+          "boundingBox": [100, 800, 250, 820]
         }
       ]
     }

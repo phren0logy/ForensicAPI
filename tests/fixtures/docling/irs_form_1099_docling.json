@@ -873,10 +873,7 @@
               "b": 757.0,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              9
-            ]
+            "charspan": [0, 9]
           }
         ],
         "orig": "VOID /Off",
@@ -900,10 +897,7 @@
               "b": 757.0,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              14
-            ]
+            "charspan": [0, 14]
           }
         ],
         "orig": "CORRECTED /Off",
@@ -927,10 +921,7 @@
               "b": 726.482,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              4
-            ]
+            "charspan": [0, 4]
           }
         ],
         "orig": "Form",
@@ -954,10 +945,7 @@
               "b": 725.37,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              9
-            ]
+            "charspan": [0, 9]
           }
         ],
         "orig": "1099-MISC",
@@ -981,10 +969,7 @@
               "b": 711.32,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              17
-            ]
+            "charspan": [0, 17]
           }
         ],
         "orig": "(Rev. April 2025)",
@@ -1008,10 +993,7 @@
               "b": 708.316,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              25
-            ]
+            "charspan": [0, 25]
           }
         ],
         "orig": "Miscellaneous Information",
@@ -1036,10 +1018,7 @@
               "b": 650.139,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              31
-            ]
+            "charspan": [0, 31]
           }
         ],
         "orig": "Copy 1 For State Tax Department",
@@ -1063,10 +1042,7 @@
               "b": 747.32,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              17
-            ]
+            "charspan": [0, 17]
           }
         ],
         "orig": "OMB No. 1545-0115",
@@ -1090,10 +1066,7 @@
               "b": 698.88,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              17
-            ]
+            "charspan": [0, 17]
           }
         ],
         "orig": "For calendar year",
@@ -1117,10 +1090,7 @@
               "b": 738.478,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              117
-            ]
+            "charspan": [0, 117]
           }
         ],
         "orig": "PAYER'S name, street address, city or town, state or province, country, ZIP or foreign postal code, and telephone no.",
@@ -1144,10 +1114,7 @@
               "b": 650.877,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              11
-            ]
+            "charspan": [0, 11]
           }
         ],
         "orig": "PAYER'S TIN",
@@ -1171,10 +1138,7 @@
               "b": 650.877,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              15
-            ]
+            "charspan": [0, 15]
           }
         ],
         "orig": "RECIPIENT'S TIN",
@@ -1198,10 +1162,7 @@
               "b": 602.878,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              16
-            ]
+            "charspan": [0, 16]
           }
         ],
         "orig": "RECIPIENT'S name",
@@ -1225,10 +1186,7 @@
               "b": 566.878,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              35
-            ]
+            "charspan": [0, 35]
           }
         ],
         "orig": "Street address (including apt. no.)",
@@ -1252,10 +1210,7 @@
               "b": 530.878,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              72
-            ]
+            "charspan": [0, 72]
           }
         ],
         "orig": "City or town, state or province, country, and ZIP or foreign postal code",
@@ -1279,10 +1234,7 @@
               "b": 458.879,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              33
-            ]
+            "charspan": [0, 33]
           }
         ],
         "orig": "Account number (see instructions)",
@@ -1306,10 +1258,7 @@
               "b": 746.878,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              7
-            ]
+            "charspan": [0, 7]
           }
         ],
         "orig": "1 Rents",
@@ -1335,10 +1284,7 @@
               "b": 721.255,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              1
-            ]
+            "charspan": [0, 1]
           }
         ],
         "orig": "$",
@@ -1362,10 +1308,7 @@
               "b": 710.878,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              11
-            ]
+            "charspan": [0, 11]
           }
         ],
         "orig": "2 Royalties",
@@ -1391,10 +1334,7 @@
               "b": 685.255,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              1
-            ]
+            "charspan": [0, 1]
           }
         ],
         "orig": "$",
@@ -1418,10 +1358,7 @@
               "b": 674.878,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              14
-            ]
+            "charspan": [0, 14]
           }
         ],
         "orig": "3 Other income",
@@ -1447,10 +1384,7 @@
               "b": 661.257,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              1
-            ]
+            "charspan": [0, 1]
           }
         ],
         "orig": "$",
@@ -1474,10 +1408,7 @@
               "b": 674.878,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              29
-            ]
+            "charspan": [0, 29]
           }
         ],
         "orig": "4 Federal income tax withheld",
@@ -1503,10 +1434,7 @@
               "b": 660.002,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              8
-            ]
+            "charspan": [0, 8]
           }
         ],
         "orig": "$ 02,345",
@@ -1530,10 +1458,7 @@
               "b": 650.877,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              23
-            ]
+            "charspan": [0, 23]
           }
         ],
         "orig": "5 Fishing boat proceeds",
@@ -1559,10 +1484,7 @@
               "b": 613.255,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              1
-            ]
+            "charspan": [0, 1]
           }
         ],
         "orig": "$",
@@ -1586,10 +1508,7 @@
               "b": 642.478,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              34
-            ]
+            "charspan": [0, 34]
           }
         ],
         "orig": "6 Medical and health care payments",
@@ -1615,10 +1534,7 @@
               "b": 612.0,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              8
-            ]
+            "charspan": [0, 8]
           }
         ],
         "orig": "$ 01,123",
@@ -1642,10 +1558,7 @@
               "b": 577.679,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              94
-            ]
+            "charspan": [0, 94]
           }
         ],
         "orig": "7 Payer made direct sales totaling $5,000 or more of consumer products to recipient for resale",
@@ -1671,10 +1584,7 @@
               "b": 594.478,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              54
-            ]
+            "charspan": [0, 54]
           }
         ],
         "orig": "8 Substitute payments in lieu of dividends or interest",
@@ -1700,10 +1610,7 @@
               "b": 576.0,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              7
-            ]
+            "charspan": [0, 7]
           }
         ],
         "orig": "$ /Off0",
@@ -1727,10 +1634,7 @@
               "b": 566.878,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              25
-            ]
+            "charspan": [0, 25]
           }
         ],
         "orig": "9 Crop insurance proceeds",
@@ -1756,10 +1660,7 @@
               "b": 541.255,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              1
-            ]
+            "charspan": [0, 1]
           }
         ],
         "orig": "$",
@@ -1783,10 +1684,7 @@
               "b": 558.478,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              37
-            ]
+            "charspan": [0, 37]
           }
         ],
         "orig": "10 Gross proceeds paid to an attorney",
@@ -1812,10 +1710,7 @@
               "b": 540.0,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              4
-            ]
+            "charspan": [0, 4]
           }
         ],
         "orig": "$ 00",
@@ -1839,10 +1734,7 @@
               "b": 530.878,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              28
-            ]
+            "charspan": [0, 28]
           }
         ],
         "orig": "11 Fish purchased for resale",
@@ -1868,10 +1760,7 @@
               "b": 474.0,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              52
-            ]
+            "charspan": [0, 52]
           }
         ],
         "orig": "$ $ 14 15 Nonqualified deferred compensation /Off 00",
@@ -1895,10 +1784,7 @@
               "b": 530.878,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              25
-            ]
+            "charspan": [0, 25]
           }
         ],
         "orig": "12 Section 409A deferrals",
@@ -1924,10 +1810,7 @@
               "b": 486.479,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              27
-            ]
+            "charspan": [0, 27]
           }
         ],
         "orig": "13 FATCA filing requirement",
@@ -1953,10 +1836,7 @@
               "b": 444.002,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              61
-            ]
+            "charspan": [0, 61]
           }
         ],
         "orig": "$ 16 State tax withheld $ 17 State/Payer's state no. 458.27 0",
@@ -1980,10 +1860,7 @@
               "b": 433.255,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              1
-            ]
+            "charspan": [0, 1]
           }
         ],
         "orig": "$",
@@ -2007,10 +1884,7 @@
               "b": 458.879,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              15
-            ]
+            "charspan": [0, 15]
           }
         ],
         "orig": "18 State income",
@@ -2036,10 +1910,7 @@
               "b": 445.257,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              1
-            ]
+            "charspan": [0, 1]
           }
         ],
         "orig": "$",
@@ -2063,10 +1934,7 @@
               "b": 433.255,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              1
-            ]
+            "charspan": [0, 1]
           }
         ],
         "orig": "$",
@@ -2090,10 +1958,7 @@
               "b": 687.0,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              4
-            ]
+            "charspan": [0, 4]
           }
         ],
         "orig": "2025",
@@ -2117,10 +1982,7 @@
               "b": 659.999,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              52
-            ]
+            "charspan": [0, 52]
           }
         ],
         "orig": "JumboCorp Inc.\n2325 Alphabet Dr.\nSmithfield IN 23251",
@@ -2144,10 +2006,7 @@
               "b": 612.0,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              20
-            ]
+            "charspan": [0, 20]
           }
         ],
         "orig": "32-395786545-3850981",
@@ -2171,10 +2030,7 @@
               "b": 576.0,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              19
-            ]
+            "charspan": [0, 19]
           }
         ],
         "orig": "William Worthington",
@@ -2198,10 +2054,7 @@
               "b": 540.0,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              18
-            ]
+            "charspan": [0, 18]
           }
         ],
         "orig": "342 Greenbriar Tr.",
@@ -2225,10 +2078,7 @@
               "b": 504.0,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              17
-            ]
+            "charspan": [0, 17]
           }
         ],
         "orig": "Cosgrove IN 23243",
@@ -2252,10 +2102,7 @@
               "b": 720.0,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              7
-            ]
+            "charspan": [0, 7]
           }
         ],
         "orig": "10,1342",
@@ -2279,10 +2126,7 @@
               "b": 684.0,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              1
-            ]
+            "charspan": [0, 1]
           }
         ],
         "orig": "0",
@@ -2306,10 +2150,7 @@
               "b": 444.002,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              8
-            ]
+            "charspan": [0, 8]
           }
         ],
         "orig": "3,815.37",
@@ -2333,10 +2174,7 @@
               "b": 421.265,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              28
-            ]
+            "charspan": [0, 28]
           }
         ],
         "orig": "Form 1099-MISC (Rev. 4-2025)",
@@ -2360,10 +2198,7 @@
               "b": 421.38,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              24
-            ]
+            "charspan": [0, 24]
           }
         ],
         "orig": "www.irs.gov/Form1099MISC",
@@ -2387,10 +2222,7 @@
               "b": 421.38,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              53
-            ]
+            "charspan": [0, 53]
           }
         ],
         "orig": "Department of the Treasury - Internal Revenue Service",
@@ -2414,10 +2246,7 @@
               "b": 757.0,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              27
-            ]
+            "charspan": [0, 27]
           }
         ],
         "orig": "CORRECTED (if checked) /Off",
@@ -2441,10 +2270,7 @@
               "b": 726.482,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              4
-            ]
+            "charspan": [0, 4]
           }
         ],
         "orig": "Form",
@@ -2468,10 +2294,7 @@
               "b": 725.37,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              9
-            ]
+            "charspan": [0, 9]
           }
         ],
         "orig": "1099-MISC",
@@ -2495,10 +2318,7 @@
               "b": 711.32,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              17
-            ]
+            "charspan": [0, 17]
           }
         ],
         "orig": "(Rev. April 2025)",
@@ -2522,10 +2342,7 @@
               "b": 708.316,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              25
-            ]
+            "charspan": [0, 25]
           }
         ],
         "orig": "Miscellaneous Information",
@@ -2550,10 +2367,7 @@
               "b": 660.138,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              20
-            ]
+            "charspan": [0, 20]
           }
         ],
         "orig": "Copy B For Recipient",
@@ -2577,10 +2391,7 @@
               "b": 478.204,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              247
-            ]
+            "charspan": [0, 247]
           }
         ],
         "orig": "This is important tax information and is being furnished to the IRS. If you are required to file a return, a negligence penalty or other sanction may be imposed on you if this income is taxable and the IRS determines that it has not been reported.",
@@ -2604,10 +2415,7 @@
               "b": 747.32,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              17
-            ]
+            "charspan": [0, 17]
           }
         ],
         "orig": "OMB No. 1545-0115",
@@ -2631,10 +2439,7 @@
               "b": 698.88,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              17
-            ]
+            "charspan": [0, 17]
           }
         ],
         "orig": "For calendar year",
@@ -2658,10 +2463,7 @@
               "b": 738.478,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              117
-            ]
+            "charspan": [0, 117]
           }
         ],
         "orig": "PAYER'S name, street address, city or town, state or province, country, ZIP or foreign postal code, and telephone no.",
@@ -2685,10 +2487,7 @@
               "b": 650.877,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              11
-            ]
+            "charspan": [0, 11]
           }
         ],
         "orig": "PAYER'S TIN",
@@ -2712,10 +2511,7 @@
               "b": 650.877,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              15
-            ]
+            "charspan": [0, 15]
           }
         ],
         "orig": "RECIPIENT'S TIN",
@@ -2739,10 +2535,7 @@
               "b": 602.878,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              16
-            ]
+            "charspan": [0, 16]
           }
         ],
         "orig": "RECIPIENT'S name",
@@ -2766,10 +2559,7 @@
               "b": 566.878,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              35
-            ]
+            "charspan": [0, 35]
           }
         ],
         "orig": "Street address (including apt. no.)",
@@ -2793,10 +2583,7 @@
               "b": 530.878,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              72
-            ]
+            "charspan": [0, 72]
           }
         ],
         "orig": "City or town, state or province, country, and ZIP or foreign postal code",
@@ -2820,10 +2607,7 @@
               "b": 458.879,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              33
-            ]
+            "charspan": [0, 33]
           }
         ],
         "orig": "Account number (see instructions)",
@@ -2847,10 +2631,7 @@
               "b": 746.878,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              7
-            ]
+            "charspan": [0, 7]
           }
         ],
         "orig": "1 Rents",
@@ -2876,10 +2657,7 @@
               "b": 721.255,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              1
-            ]
+            "charspan": [0, 1]
           }
         ],
         "orig": "$",
@@ -2903,10 +2681,7 @@
               "b": 710.878,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              11
-            ]
+            "charspan": [0, 11]
           }
         ],
         "orig": "2 Royalties",
@@ -2932,10 +2707,7 @@
               "b": 685.255,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              1
-            ]
+            "charspan": [0, 1]
           }
         ],
         "orig": "$",
@@ -2959,10 +2731,7 @@
               "b": 674.878,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              14
-            ]
+            "charspan": [0, 14]
           }
         ],
         "orig": "3 Other income",
@@ -2988,10 +2757,7 @@
               "b": 661.257,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              1
-            ]
+            "charspan": [0, 1]
           }
         ],
         "orig": "$",
@@ -3015,10 +2781,7 @@
               "b": 674.884,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              29
-            ]
+            "charspan": [0, 29]
           }
         ],
         "orig": "4 Federal income tax withheld",
@@ -3044,10 +2807,7 @@
               "b": 660.002,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              8
-            ]
+            "charspan": [0, 8]
           }
         ],
         "orig": "$ 02,345",
@@ -3071,10 +2831,7 @@
               "b": 650.877,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              23
-            ]
+            "charspan": [0, 23]
           }
         ],
         "orig": "5 Fishing boat proceeds",
@@ -3100,10 +2857,7 @@
               "b": 613.255,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              1
-            ]
+            "charspan": [0, 1]
           }
         ],
         "orig": "$",
@@ -3127,10 +2881,7 @@
               "b": 642.478,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              34
-            ]
+            "charspan": [0, 34]
           }
         ],
         "orig": "6 Medical and health care payments",
@@ -3156,10 +2907,7 @@
               "b": 612.0,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              8
-            ]
+            "charspan": [0, 8]
           }
         ],
         "orig": "$ 01,123",
@@ -3183,10 +2931,7 @@
               "b": 577.679,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              94
-            ]
+            "charspan": [0, 94]
           }
         ],
         "orig": "7 Payer made direct sales totaling $5,000 or more of consumer products to recipient for resale",
@@ -3212,10 +2957,7 @@
               "b": 594.478,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              54
-            ]
+            "charspan": [0, 54]
           }
         ],
         "orig": "8 Substitute payments in lieu of dividends or interest",
@@ -3241,10 +2983,7 @@
               "b": 576.0,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              7
-            ]
+            "charspan": [0, 7]
           }
         ],
         "orig": "$ /Off0",
@@ -3268,10 +3007,7 @@
               "b": 566.878,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              25
-            ]
+            "charspan": [0, 25]
           }
         ],
         "orig": "9 Crop insurance proceeds",
@@ -3297,10 +3033,7 @@
               "b": 541.255,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              1
-            ]
+            "charspan": [0, 1]
           }
         ],
         "orig": "$",
@@ -3324,10 +3057,7 @@
               "b": 558.478,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              37
-            ]
+            "charspan": [0, 37]
           }
         ],
         "orig": "10 Gross proceeds paid to an attorney",
@@ -3353,10 +3083,7 @@
               "b": 540.0,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              4
-            ]
+            "charspan": [0, 4]
           }
         ],
         "orig": "$ 00",
@@ -3380,10 +3107,7 @@
               "b": 530.878,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              28
-            ]
+            "charspan": [0, 28]
           }
         ],
         "orig": "11 Fish purchased for resale",
@@ -3409,10 +3133,7 @@
               "b": 474.0,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              52
-            ]
+            "charspan": [0, 52]
           }
         ],
         "orig": "$ $ 14 15 Nonqualified deferred compensation /Off 00",
@@ -3436,10 +3157,7 @@
               "b": 530.878,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              25
-            ]
+            "charspan": [0, 25]
           }
         ],
         "orig": "12 Section 409A deferrals",
@@ -3465,10 +3183,7 @@
               "b": 486.479,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              27
-            ]
+            "charspan": [0, 27]
           }
         ],
         "orig": "13 FATCA filing requirement",
@@ -3494,10 +3209,7 @@
               "b": 444.002,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              61
-            ]
+            "charspan": [0, 61]
           }
         ],
         "orig": "$ 16 State tax withheld $ 17 State/Payer's state no. 458.27 0",
@@ -3521,10 +3233,7 @@
               "b": 433.255,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              1
-            ]
+            "charspan": [0, 1]
           }
         ],
         "orig": "$",
@@ -3548,10 +3257,7 @@
               "b": 458.879,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              15
-            ]
+            "charspan": [0, 15]
           }
         ],
         "orig": "18 State income",
@@ -3577,10 +3283,7 @@
               "b": 445.257,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              1
-            ]
+            "charspan": [0, 1]
           }
         ],
         "orig": "$",
@@ -3604,10 +3307,7 @@
               "b": 433.255,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              1
-            ]
+            "charspan": [0, 1]
           }
         ],
         "orig": "$",
@@ -3631,10 +3331,7 @@
               "b": 687.0,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              4
-            ]
+            "charspan": [0, 4]
           }
         ],
         "orig": "2025",
@@ -3658,10 +3355,7 @@
               "b": 659.999,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              52
-            ]
+            "charspan": [0, 52]
           }
         ],
         "orig": "JumboCorp Inc.\n2325 Alphabet Dr.\nSmithfield IN 23251",
@@ -3685,10 +3379,7 @@
               "b": 612.0,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              20
-            ]
+            "charspan": [0, 20]
           }
         ],
         "orig": "32-395786545-3850981",
@@ -3712,10 +3403,7 @@
               "b": 576.0,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              19
-            ]
+            "charspan": [0, 19]
           }
         ],
         "orig": "William Worthington",
@@ -3739,10 +3427,7 @@
               "b": 540.0,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              18
-            ]
+            "charspan": [0, 18]
           }
         ],
         "orig": "342 Greenbriar Tr.",
@@ -3766,10 +3451,7 @@
               "b": 504.0,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              17
-            ]
+            "charspan": [0, 17]
           }
         ],
         "orig": "Cosgrove IN 23243",
@@ -3793,10 +3475,7 @@
               "b": 720.0,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              7
-            ]
+            "charspan": [0, 7]
           }
         ],
         "orig": "10,1342",
@@ -3820,10 +3499,7 @@
               "b": 684.0,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              1
-            ]
+            "charspan": [0, 1]
           }
         ],
         "orig": "0",
@@ -3847,10 +3523,7 @@
               "b": 444.002,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              8
-            ]
+            "charspan": [0, 8]
           }
         ],
         "orig": "3,815.37",
@@ -3874,10 +3547,7 @@
               "b": 421.265,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              28
-            ]
+            "charspan": [0, 28]
           }
         ],
         "orig": "Form 1099-MISC (Rev. 4-2025)",
@@ -3901,10 +3571,7 @@
               "b": 421.005,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              23
-            ]
+            "charspan": [0, 23]
           }
         ],
         "orig": "(keep for your records)",
@@ -3928,10 +3595,7 @@
               "b": 421.38,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              24
-            ]
+            "charspan": [0, 24]
           }
         ],
         "orig": "www.irs.gov/Form1099MISC",
@@ -3955,10 +3619,7 @@
               "b": 421.38,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              53
-            ]
+            "charspan": [0, 53]
           }
         ],
         "orig": "Department of the Treasury - Internal Revenue Service",
@@ -3982,10 +3643,7 @@
               "b": 747.264,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              26
-            ]
+            "charspan": [0, 26]
           }
         ],
         "orig": "Instructions for Recipient",
@@ -4010,10 +3668,7 @@
               "b": 705.881,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              354
-            ]
+            "charspan": [0, 354]
           }
         ],
         "orig": "Recipient's taxpayer identification number (TIN). For your protection, this form may show only the last four digits of your social security number (SSN), individual taxpayer identification number (ITIN), adoption taxpayer identification number (ATIN), or employer identification number (EIN). However, the payer has reported your complete TIN to the IRS.",
@@ -4037,10 +3692,7 @@
               "b": 688.78,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              106
-            ]
+            "charspan": [0, 106]
           }
         ],
         "orig": "Account number. May show an account or other unique number the payer assigned to distinguish your account.",
@@ -4064,10 +3716,7 @@
               "b": 656.181,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              239
-            ]
+            "charspan": [0, 239]
           }
         ],
         "orig": "Amounts shown may be subject to self-employment (SE) tax. Individuals should see the Instructions for Schedule SE (Form 1040). Corporations, fiduciaries, or partnerships must report the amounts on the appropriate line of their tax returns.",
@@ -4091,10 +3740,7 @@
               "b": 631.331,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              218
-            ]
+            "charspan": [0, 218]
           }
         ],
         "orig": "Form 1099-MISC incorrect? If this form is incorrect or has been issued in error, contact the payer. If you cannot get this form corrected, attach an explanation to your tax return and report your information correctly.",
@@ -4118,10 +3764,7 @@
               "b": 598.732,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              252
-            ]
+            "charspan": [0, 252]
           }
         ],
         "orig": "Box 1. Report rents from real estate on Schedule E (Form 1040). However, report rents on Schedule C (Form 1040) if you provided significant services to the tenant, sold real estate as a business, or rented personal property as a business. See Pub. 527.",
@@ -4145,10 +3788,7 @@
               "b": 566.133,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              276
-            ]
+            "charspan": [0, 276]
           }
         ],
         "orig": "Box 2. Report royalties from oil, gas, or mineral properties; copyrights; and patents on Schedule E (Form 1040). However, report payments for a working interest as explained in the Schedule E (Form 1040) instructions. For royalties on timber, coal, and iron ore, see Pub. 544.",
@@ -4172,10 +3812,7 @@
               "b": 525.785,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              381
-            ]
+            "charspan": [0, 381]
           }
         ],
         "orig": "Box 3. Generally, report this amount on the 'Other income' line of Schedule 1 (Form 1040) and identify the payment. The amount shown may be payments received as the beneficiary of a deceased employee, prizes, awards, taxable damages, Indian gaming profits, or other taxable income. See Pub. 525. If it is trade or business income, report this amount on Schedule C or F (Form 1040).",
@@ -4199,10 +3836,7 @@
               "b": 493.186,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              255
-            ]
+            "charspan": [0, 255]
           }
         ],
         "orig": "Box 4. Shows backup withholding or withholding on Indian gaming profits. Generally, a payer must backup withhold if you did not furnish your TIN. See Form W-9 and Pub. 505 for more information. Report this amount on your income tax return as tax withheld.",
@@ -4226,10 +3860,7 @@
               "b": 468.336,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              212
-            ]
+            "charspan": [0, 212]
           }
         ],
         "orig": "Box 5. Shows the amount paid to you as a fishing boat crew member by the operator, who considers you to be self-employed. Self-employed individuals must report this amount on Schedule C (Form 1040). See Pub. 334.",
@@ -4253,10 +3884,7 @@
               "b": 737.885,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              57
-            ]
+            "charspan": [0, 57]
           }
         ],
         "orig": "Box 6. For individuals, report on Schedule C (Form 1040).",
@@ -4280,10 +3908,7 @@
               "b": 713.035,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              231
-            ]
+            "charspan": [0, 231]
           }
         ],
         "orig": "Box 7. If checked, consumer products totaling $5,000 or more were sold to you for resale, on a buy-sell, a deposit-commission, or other basis. Generally, report any income from your sale of these products on Schedule C (Form 1040).",
@@ -4307,10 +3932,7 @@
               "b": 688.185,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              218
-            ]
+            "charspan": [0, 218]
           }
         ],
         "orig": "Box 8. Shows substitute payments in lieu of dividends or tax-exempt interest received by your broker on your behalf as a result of a loan of your securities. Report on the 'Other income' line of Schedule 1 (Form 1040).",
@@ -4334,10 +3956,7 @@
               "b": 678.833,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              52
-            ]
+            "charspan": [0, 52]
           }
         ],
         "orig": "Box 9. Report this amount on Schedule F (Form 1040).",
@@ -4361,10 +3980,7 @@
               "b": 661.081,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              138
-            ]
+            "charspan": [0, 138]
           }
         ],
         "orig": "Box 10. Shows gross proceeds paid to an attorney in connection with legal services. Report only the taxable part as income on your return.",
@@ -4388,10 +4004,7 @@
               "b": 643.98,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              120
-            ]
+            "charspan": [0, 120]
           }
         ],
         "orig": "Box 11. Shows the amount of cash you received for the sale of fish if you are in the trade or business of catching fish.",
@@ -4415,10 +4028,7 @@
               "b": 611.381,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              218
-            ]
+            "charspan": [0, 218]
           }
         ],
         "orig": "Box 12. May show current year deferrals as a nonemployee under a nonqualified deferred compensation (NQDC) plan that is subject to the requirements of section 409A plus any earnings on current and prior year deferrals.",
@@ -4442,10 +4052,7 @@
               "b": 578.782,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              263
-            ]
+            "charspan": [0, 263]
           }
         ],
         "orig": "Box 13. If the FATCA filing requirement box is checked, the payer is reporting on this Form 1099 to satisfy its account reporting requirement under chapter 4 of the Internal Revenue Code. You may also have a filing requirement. See the Instructions for Form 8938.",
@@ -4469,10 +4076,7 @@
               "b": 569.43,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              32
-            ]
+            "charspan": [0, 32]
           }
         ],
         "orig": "Box 14. Reserved for future use.",
@@ -4496,10 +4100,7 @@
               "b": 520.682,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              396
-            ]
+            "charspan": [0, 396]
           }
         ],
         "orig": "Box 15. Shows income as a nonemployee under an NQDC plan that does not meet the requirements of section 409A. Any amount included in box 12 that is currently taxable is also included in this box. Report this amount as income on your tax return. This income is also subject to a substantial additional tax to be reported on Form 1040, 1040-SR, or 1040-NR. See the instructions for your tax return.",
@@ -4523,10 +4124,7 @@
               "b": 511.33,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              71
-            ]
+            "charspan": [0, 71]
           }
         ],
         "orig": "Boxes 16-18. Show state or local income tax withheld from the payments.",
@@ -4550,10 +4148,7 @@
               "b": 485.829,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              202
-            ]
+            "charspan": [0, 202]
           }
         ],
         "orig": "Future developments. For the latest information about developments related to Form 1099-MISC and its instructions, such as legislation enacted after they were published, go to www.irs.gov/Form1099MISC .",
@@ -4577,10 +4172,7 @@
               "b": 468.728,
               "coord_origin": "BOTTOMLEFT"
             },
-            "charspan": [
-              0,
-              160
-            ]
+            "charspan": [0, 160]
           }
         ],
         "orig": "Free File Program. Go to www.irs.gov/FreeFile to see if you qualify for no-cost online federal tax preparation, e-filing, and direct deposit or payment options.",

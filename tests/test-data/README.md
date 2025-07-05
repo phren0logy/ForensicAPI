@@ -32,6 +32,7 @@ test-data/
 ### Prerequisites
 
 1. Ensure the backend is running with Presidio dependencies installed:
+
    ```bash
    cd backend
    uv sync  # Installs all dependencies including Presidio
@@ -43,21 +44,26 @@ test-data/
 ### Testing Workflow
 
 1. **Test with synthetic data first** (recommended):
+
    ```bash
    cd test-data/generators
    python test_with_synthetic.py
    ```
+
    This validates the endpoint works correctly with known test cases.
 
 2. **Generate synthetic test data** (if needed):
+
    ```bash
    python generate_synthetic_test_data.py
    ```
 
 3. **Anonymize real Azure DI JSON**:
+
    ```bash
    python test_anonymization.py /path/to/real/azure-di.json
    ```
+
    Output goes to `test-data/azure-di-json/` (gitignored)
 
 4. **Anonymize with custom output path**:
@@ -70,6 +76,7 @@ test-data/
 The anonymization endpoint detects and replaces:
 
 ### Standard PII
+
 - **Names**: Replaced with realistic fake names
 - **Dates**: Shifted by random amount (preserving relative timing)
 - **SSNs**: Replaced with valid-format fake SSNs
@@ -78,12 +85,14 @@ The anonymization endpoint detects and replaces:
 - **Locations**: Replaced with fake city names
 
 ### Forensic Document Patterns
+
 - **Bates Numbers**: e.g., `BATES-001234` → `ANON-789456`
 - **Case Numbers**: e.g., `2024-CR-12345` → `2025-CR-67890`
 - **Medical Record Numbers**: e.g., `MRN12345678` → `MRN87654321`
 - **Medical License Numbers**: e.g., `MD987654` → `MD123456`
 
 ### Consistency Features
+
 - Same name always gets same replacement throughout document
 - Azure DI structure fully preserved
 - Element IDs and relationships maintained

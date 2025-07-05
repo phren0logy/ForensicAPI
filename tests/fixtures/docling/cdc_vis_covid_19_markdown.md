@@ -1,4 +1,4 @@
-## VACCINE INFORM AT I O N   S TAT E M E N T
+## VACCINE INFORM AT I O N S TAT E M E N T
 
 ## X V acine: What You Need to Know COVID-19 Vaccine: What You Need to Know
 
@@ -79,7 +79,7 @@ For other signs that concern you, call your health care provider.
 
 Adverse reactions should be reported to the Vaccine Adverse Event Reporting System (VAERS). Your health care provider will usually file this report, or you can do it yourself. Visit the VAERS website at www.vaers.hhs.gov or call 1-800-822-7967 . VAERS is only for reporting reactions, and VAERS staff do not give medical advice.
 
-## 6.   Countermeasures Injury Compensation Program
+## 6. Countermeasures Injury Compensation Program
 
 The Countermeasures Injury Compensation Program (CICP) is a federal program that may help pay for costs of medical care and other specific expenses of certain people who have been seriously injured by certain medicines or vaccines, including this vaccine. Generally, a claim must be submitted to the CICP within one (1) year from the date of receiving the vaccine. To learn more about this program, visit the program's website at www.hrsa.gov/cicp , or call 1-855-266-2427 .
 

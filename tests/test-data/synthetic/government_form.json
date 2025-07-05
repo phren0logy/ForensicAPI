@@ -12,42 +12,22 @@
       "selectionMarks": [
         {
           "state": "selected",
-          "boundingBox": [
-            50,
-            600,
-            70,
-            620
-          ],
+          "boundingBox": [50, 600, 70, 620],
           "confidence": 0.99
         },
         {
           "state": "selected",
-          "boundingBox": [
-            50,
-            630,
-            70,
-            650
-          ],
+          "boundingBox": [50, 630, 70, 650],
           "confidence": 0.99
         },
         {
           "state": "unselected",
-          "boundingBox": [
-            50,
-            660,
-            70,
-            680
-          ],
+          "boundingBox": [50, 660, 70, 680],
           "confidence": 0.99
         },
         {
           "state": "selected",
-          "boundingBox": [
-            50,
-            690,
-            70,
-            710
-          ],
+          "boundingBox": [50, 690, 70, 710],
           "confidence": 0.99
         }
       ]

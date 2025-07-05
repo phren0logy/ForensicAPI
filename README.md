@@ -25,7 +25,6 @@ FastAPI provides automatic interactive API documentation:
    ```
 
 2. **Visit the interactive documentation:**
-
    - [Swagger UI](http://127.0.0.1:8000/docs) - Interactive API testing
    - [ReDoc](http://127.0.0.1:8000/redoc) - Alternative API documentation
 
@@ -74,6 +73,7 @@ LOG_LEVEL=INFO
 ### Examples
 
 Example scripts are provided in the `examples/` directory:
+
 - `pseudonymization_demo.py`: Demonstrates stateless pseudonymization and deanonymization workflows
 
 ### Running the Server
@@ -382,8 +382,8 @@ uv run run.py
         "date_shift_days": 365,
         "return_decision_process": false
       },
-      "vault_data": [  /* Optional: Previous vault data for consistent replacements */
-        ["John Doe", "Jane Smith"],
+      "vault_data": [
+        /* Optional: Previous vault data for consistent replacements */ ["John Doe", "Jane Smith"],
         ["_date_offset", "-365"]
       ]
     }
@@ -503,7 +503,9 @@ uv run run.py
   ```json
   {
     "text": "Pseudonymized text",
-    "vault_data": [ /* Required: Vault data from pseudonymization */ ]
+    "vault_data": [
+      /* Required: Vault data from pseudonymization */
+    ]
   }
   ```
 - **Response:**
@@ -596,6 +598,7 @@ The anonymization endpoints support the following configuration parameters:
 - **return_decision_process**: Include debugging information about detection reasoning (default: false) - Note: Not currently supported with LLM-Guard
 
 ## Planned Features
+
 - **Custom Regex Pattern Support**: Allow users to define domain-specific entity patterns
 - **Multi-language Support**: Currently English-only, planning to add other languages
 - **Batch Processing**: Anonymize multiple documents in a single request
@@ -688,22 +691,18 @@ curl -X POST http://localhost:8000/compose-prompt \
 ### Common Errors and Solutions
 
 - **413 Request Entity Too Large**
-
   - Solution: Reduce the `batch_size` parameter in `/extract`
   - Default file size limit can be increased in server configuration
 
 - **Azure DI Timeout (504 Gateway Timeout)**
-
   - Large PDFs may exceed Azure's processing time
   - Solution: Use smaller batch sizes (e.g., 500-1000 pages)
 
 - **Memory Errors**
-
   - For documents with many tables or complex layouts
   - Solution: Process in smaller segments or increase server memory
 
 - **AI4Privacy Model Loading Errors**
-
   - LLM-Guard will download the AI4Privacy model on first use
   - Solution: Ensure internet connectivity for model download (~134MB)
 

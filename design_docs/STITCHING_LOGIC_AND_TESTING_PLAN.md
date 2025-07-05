@@ -11,12 +11,10 @@ The application now includes enhanced logic with the following improvements:
 ### New Features in `routes/extraction.py`:
 
 1. **Automatic Page Offset Calculation**:
-
    - `calculate_page_offset()` automatically determines the correct offset between batches
    - No need for manual offset calculations in most cases
 
 2. **Input Validation**:
-
    - `validate_batch_structure()` ensures Azure DI format compliance
    - `validate_batch_sequence()` checks for consecutive page numbering
    - Optional validation in `stitch_analysis_results()` (enabled by default)
