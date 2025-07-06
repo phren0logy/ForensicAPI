@@ -9,27 +9,27 @@ default_config:
 
 # Entity types to detect and anonymize
 entity_types:
-  - PERSON              # Names of individuals
-  - DATE_TIME          # Dates and times
-  - LOCATION           # Cities, addresses
-  - PHONE_NUMBER       # Phone numbers
-  - EMAIL_ADDRESS      # Email addresses
-  - US_SSN            # Social Security Numbers
-  - MEDICAL_LICENSE    # Medical license numbers
-  - BATES_NUMBER      # Legal document identifiers
-  - CASE_NUMBER       # Case and docket numbers
-  - MEDICAL_RECORD_NUMBER  # MRN, Patient IDs
+  - PERSON # Names of individuals
+  - DATE_TIME # Dates and times
+  - LOCATION # Cities, addresses
+  - PHONE_NUMBER # Phone numbers
+  - EMAIL_ADDRESS # Email addresses
+  - US_SSN # Social Security Numbers
+  - MEDICAL_LICENSE # Medical license numbers
+  - BATES_NUMBER # Legal document identifiers
+  - CASE_NUMBER # Case and docket numbers
+  - MEDICAL_RECORD_NUMBER # MRN, Patient IDs
 
 # Custom patterns for forensic documents
 custom_patterns:
   bates_standard:
     pattern: '\b[A-Z]{2,4}[-_]?\d{6,8}\b'
     examples: ['BATES-001234', 'DOC_567890']
-  
+
   case_number:
     pattern: '\b\d{2,4}[-/]\w{2,4}[-/]\d{3,6}\b'
     examples: ['2024-CR-12345', '24/CV/6789']
-  
+
   medical_record:
     pattern: '\b(?:MRN|MR#?)[\s:]*\d{6,10}\b'
     examples: ['MRN: 12345678', 'MR# 987654']
@@ -54,7 +54,7 @@ replacement_strategies:
   PHONE_NUMBER: faker.phone_number()
   EMAIL_ADDRESS: faker.email()
   US_SSN: faker.ssn()
-  MEDICAL_LICENSE: "MD{random_6_digits}"
-  BATES_NUMBER: "ANON-{random_6_digits}"
-  CASE_NUMBER: "{year}-CR-{random_5_digits}"
-  MEDICAL_RECORD_NUMBER: "MRN{random_8_digits}"
+  MEDICAL_LICENSE: 'MD{random_6_digits}'
+  BATES_NUMBER: 'ANON-{random_6_digits}'
+  CASE_NUMBER: '{year}-CR-{random_5_digits}'
+  MEDICAL_RECORD_NUMBER: 'MRN{random_8_digits}'

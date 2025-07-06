@@ -68,6 +68,7 @@ response2 = requests.post("/anonymization/anonymize-markdown", json={
 ## Storage Options
 
 ### 1. JSON File
+
 ```python
 import json
 
@@ -81,6 +82,7 @@ with open('vault.json', 'r') as f:
 ```
 
 ### 2. Database (PostgreSQL)
+
 ```sql
 CREATE TABLE anonymization_vaults (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -95,6 +97,7 @@ VALUES ('doc_123', $1::jsonb);
 ```
 
 ### 3. Redis Cache
+
 ```python
 import redis
 import json
@@ -115,11 +118,13 @@ if vault_json:
 **Important**: Due to LLM-Guard's current implementation, when `use_faker=True` is enabled (which is the default), the library generates new fake values on each scan even if the original value already exists in the vault. The vault tracks all mappings but doesn't enforce consistency for faker replacements.
 
 This means:
+
 - The vault data will contain all mappings from all requests
 - But the actual replacement values may differ between requests
 - This is a limitation of the LLM-Guard library, not our implementation
 
 For applications requiring strict consistency, consider:
+
 1. Post-processing the results to enforce consistency
 2. Using a custom anonymization solution
 3. Contributing improvements to the LLM-Guard project

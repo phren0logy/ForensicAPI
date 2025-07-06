@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
   <head>
     <title>PDF Extraction Test</title>
@@ -18,10 +18,12 @@
       download="extracted.md"
       >Download Markdown</a
     >
-    <pre style="max-height: 400px; overflow-y: auto;">{{ result.markdown_content }}</pre>
+    <pre style="max-height: 400px; overflow-y: auto">{{ result.markdown_content }}</pre>
     {% endif %}
     <h3>Analysis Result:</h3>
-    <pre style="max-height: 400px; overflow-y: auto;">{{ result.analysis_result | tojson(indent=2) }}</pre>
+    <pre style="max-height: 400px; overflow-y: auto">
+{{ result.analysis_result | tojson(indent=2) }}</pre
+    >
     {% endif %}
   </body>
 </html>

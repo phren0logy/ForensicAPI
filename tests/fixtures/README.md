@@ -18,19 +18,25 @@ tests/fixtures/
 ## Fixture Generation Scripts
 
 ### 1. `scripts/add_ids_to_fixtures.py`
+
 Adds element IDs to existing fixtures using the same logic as the `/extract` endpoint.
+
 ```bash
 uv run python scripts/add_ids_to_fixtures.py
 ```
 
 ### 2. `scripts/generate_test_fixtures.py`
+
 Generates Azure DI fixtures from sample PDFs with automatic ID generation.
+
 ```bash
 uv run python scripts/generate_test_fixtures.py
 ```
 
 ### 3. `scripts/generate_docling_fixtures.py`
+
 Generates Docling format fixtures through the `/extract-local` endpoint.
+
 ```bash
 # Start the server first
 uv run run.py
@@ -74,30 +80,33 @@ Example: `para_1_0_a3f2b1`
 ## Testing Approach
 
 ### 1. Azure DI Testing (`/extract`)
+
 - Tests with and without element IDs (`include_element_ids` parameter)
 - Validates batch processing and stitching
 - Ensures ID uniqueness and preservation
 
 ### 2. Docling Testing (`/extract-local`)
+
 - Tests local extraction without external API calls
 - Validates OCR functionality
 - Note: Currently doesn't support element IDs or filtering
 
 ### 3. Comparison Testing
+
 - Compare extraction quality between Azure DI and Docling
 - Validate consistent markdown output
 - Test performance differences
 
 ## Key Differences: Azure DI vs Docling
 
-| Feature | Azure DI | Docling |
-|---------|----------|---------|
-| Element IDs | ✅ Supported | ❌ Not yet |
-| Filtering | ✅ Supported | ❌ Not yet |
-| Batch Processing | ✅ Built-in | ❌ Single file |
-| OCR | ✅ Cloud-based | ✅ Local (ocrmac/EasyOCR) |
-| Format | Azure DI JSON | Docling JSON |
-| Cost | Per-page pricing | Free (local) |
+| Feature          | Azure DI         | Docling                   |
+| ---------------- | ---------------- | ------------------------- |
+| Element IDs      | ✅ Supported     | ❌ Not yet                |
+| Filtering        | ✅ Supported     | ❌ Not yet                |
+| Batch Processing | ✅ Built-in      | ❌ Single file            |
+| OCR              | ✅ Cloud-based   | ✅ Local (ocrmac/EasyOCR) |
+| Format           | Azure DI JSON    | Docling JSON              |
+| Cost             | Per-page pricing | Free (local)              |
 
 ## Running Tests
 

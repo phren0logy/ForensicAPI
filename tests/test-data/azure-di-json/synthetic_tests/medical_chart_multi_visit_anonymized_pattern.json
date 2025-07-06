@@ -12,62 +12,32 @@
       "words": [
         {
           "content": "Sarah",
-          "boundingBox": [
-            100,
-            200,
-            150,
-            220
-          ],
+          "boundingBox": [100, 200, 150, 220],
           "confidence": 0.99
         },
         {
           "content": "Johnson",
-          "boundingBox": [
-            160,
-            200,
-            210,
-            220
-          ],
+          "boundingBox": [160, 200, 210, 220],
           "confidence": 0.99
         },
         {
           "content": "98765432",
-          "boundingBox": [
-            100,
-            240,
-            180,
-            260
-          ],
+          "boundingBox": [100, 240, 180, 260],
           "confidence": 0.98
         }
       ],
       "lines": [
         {
           "content": "Patient: Sarah Johnson",
-          "boundingBox": [
-            100,
-            200,
-            300,
-            220
-          ]
+          "boundingBox": [100, 200, 300, 220]
         },
         {
           "content": "MRN61807672",
-          "boundingBox": [
-            100,
-            240,
-            300,
-            260
-          ]
+          "boundingBox": [100, 240, 300, 260]
         },
         {
           "content": "SSN: 2212-CR-69594",
-          "boundingBox": [
-            100,
-            280,
-            300,
-            300
-          ]
+          "boundingBox": [100, 280, 300, 300]
         }
       ]
     },
@@ -80,21 +50,11 @@
       "lines": [
         {
           "content": "Provider: Dr. Emily Rodriguez",
-          "boundingBox": [
-            100,
-            100,
-            400,
-            120
-          ]
+          "boundingBox": [100, 100, 400, 120]
         },
         {
           "content": "MD License: ANON-204539",
-          "boundingBox": [
-            100,
-            140,
-            350,
-            160
-          ]
+          "boundingBox": [100, 140, 350, 160]
         }
       ]
     }
