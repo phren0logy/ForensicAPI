@@ -55,8 +55,7 @@ def test_extract_local_basic():
 
     # Verify response structure
     assert "markdown_content" in result
-    assert "docling_document" in result
-    assert "ocr_applied" in result
+    assert "json_content" in result
     assert "metadata" in result
 
     # Check that content was extracted
@@ -64,16 +63,20 @@ def test_extract_local_basic():
     assert "Test PDF" in result["markdown_content"]
 
     # Verify Docling document structure
-    doc = result["docling_document"]
+    doc = result["json_content"]
     assert doc["schema_name"] == "DoclingDocument"
     assert "body" in doc
     assert "texts" in doc or "pictures" in doc or "tables" in doc
 
     # Check metadata
     metadata = result["metadata"]
+    assert metadata["processing_type"] == "docling"
     assert metadata["filename"] == "test.pdf"
     assert metadata["ocr_enabled"] is True
-    assert metadata["pages_processed"] >= 1
+    assert metadata["ocr_applied"] in [True, False]
+    assert metadata["page_count"] >= 1
+    assert "processing_time" in metadata
+    assert "file_size" in metadata
 
 
 def test_extract_local_without_ocr():
@@ -88,7 +91,7 @@ def test_extract_local_without_ocr():
     result = resp.json()
 
     # Verify OCR was not applied
-    assert result["ocr_applied"] is False
+    assert result["metadata"]["ocr_applied"] is False
     assert result["metadata"]["ocr_enabled"] is False
 
 
@@ -235,7 +238,7 @@ def test_extract_local_real_scanned_pdf():
         result = resp.json()
 
         # OCR should be applied and produce content
-        assert result["ocr_applied"] is True
+        assert result["metadata"]["ocr_applied"] is True
         assert len(result["markdown_content"]) > 100  # Should have substantial content
     else:
         pytest.skip("Scanned PDF test fixture not found")

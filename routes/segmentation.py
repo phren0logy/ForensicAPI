@@ -35,13 +35,13 @@ class RichSegment(BaseModel):
 
 class SegmentationInput(BaseModel):
     source_file: str
-    analysis_result: Dict[str, Any]
+    json_content: Dict[str, Any]  # Changed from analysis_result
     min_segment_tokens: int = 10000  # Configurable with reasonable default
     max_segment_tokens: int = 30000  # Configurable with reasonable default
 
 class FilteredSegmentationInput(BaseModel):
     source_file: str
-    analysis_result: Dict[str, Any]
+    json_content: Dict[str, Any]  # Changed from analysis_result
     filter_config: FilterConfig
     min_segment_tokens: int = 10000  # Configurable with reasonable default
     max_segment_tokens: int = 30000  # Configurable with reasonable default
@@ -337,7 +337,7 @@ async def segment_document(payload: SegmentationInput = Body(...)):
     
     **Input:**
     - `source_file`: Name of the original document
-    - `analysis_result`: Complete Azure DI analysis result (from Phase 1 extraction)
+    - `json_content`: Complete Azure DI analysis result (from Phase 1 extraction)
     - `min_segment_tokens`: Minimum tokens per segment (default: 10,000)
     - `max_segment_tokens`: Maximum tokens per segment - soft limit (default: 30,000)
     
@@ -355,7 +355,7 @@ async def segment_document(payload: SegmentationInput = Body(...)):
     ```python
     payload = {
         "source_file": "document.pdf",
-        "analysis_result": {...},  # Azure DI output
+        "json_content": {...},  # Azure DI output
         "min_segment_tokens": 5000,
         "max_segment_tokens": 15000
     }
@@ -380,15 +380,15 @@ async def segment_document(payload: SegmentationInput = Body(...)):
         logger.error(error_msg)
         raise ValueError(error_msg)
     
-    # Validate analysis_result structure
-    if not isinstance(payload.analysis_result, dict):
-        error_msg = "analysis_result must be a dictionary"
+    # Validate json_content structure
+    if not isinstance(payload.json_content, dict):
+        error_msg = "json_content must be a dictionary"
         logger.error(error_msg)
         raise ValueError(error_msg)
     
     try:
         rich_segments = create_rich_segments(
-            payload.analysis_result, 
+            payload.json_content, 
             payload.source_file,
             payload.min_segment_tokens,
             payload.max_segment_tokens
@@ -418,7 +418,7 @@ async def segment_with_filtering(payload: FilteredSegmentationInput = Body(...))
     
     **Input:**
     - `source_file`: Name of the original document
-    - `analysis_result`: Complete Azure DI analysis result
+    - `json_content`: Complete Azure DI analysis result
     - `filter_config`: Configuration for filtering elements
     - `min_segment_tokens`: Minimum tokens per segment (default: 10,000)
     - `max_segment_tokens`: Maximum tokens per segment (default: 30,000)
@@ -438,7 +438,7 @@ async def segment_with_filtering(payload: FilteredSegmentationInput = Body(...))
     ```python
     payload = {
         "source_file": "contract.pdf",
-        "analysis_result": {...},  # Azure DI output
+        "json_content": {...},  # Azure DI output
         "filter_config": {
             "filter_preset": "legal_analysis",
             "include_element_ids": true
@@ -463,9 +463,9 @@ async def segment_with_filtering(payload: FilteredSegmentationInput = Body(...))
         raise HTTPException(status_code=400, detail=f"min_segment_tokens must be less than max_segment_tokens")
     
     try:
-        # Step 1: Apply filters to the analysis result
+        # Step 1: Apply filters to the json_content
         filtered_elements, element_mappings, metrics = apply_filters(
-            payload.analysis_result,
+            payload.json_content,
             payload.filter_config
         )
         

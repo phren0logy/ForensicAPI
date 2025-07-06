@@ -82,7 +82,7 @@ def extract_statistics(docling_response: Dict[str, Any]) -> Dict[str, Any]:
     }
     
     # Get page count from docling document
-    docling_doc = docling_response.get("docling_document", {})
+    docling_doc = docling_response.get("json_content", {})
     pages = docling_doc.get("pages", {})
     stats["pages"] = len(pages)
     

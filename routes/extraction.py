@@ -3,6 +3,7 @@ import hashlib
 import logging
 import os
 import tempfile
+import time
 from typing import Any, Dict, List, Optional, Tuple
 import copy
 
@@ -389,6 +390,8 @@ async def extract(
         include_element_ids: Add unique _id fields to all elements (default: True)
         return_both: Return both original and ID-enriched versions (default: False)
     """
+    start_time = time.time()
+    
     logger.info(
         f"/extract endpoint called for file: {file.filename}, "
         f"batch_size: {batch_size}, include_element_ids: {include_element_ids}, "
@@ -407,37 +410,56 @@ async def extract(
         endpoint=endpoint, credential=AzureKeyCredential(key)
     )
 
+    # Get file size before reading
+    file_size = file.size if file.size else 0
+    
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_file:
         contents = await file.read()
+        if file_size == 0:  # If size wasn't available before reading
+            file_size = len(contents)
         temp_file.write(contents)
         temp_file.flush()
         temp_path = temp_file.name
 
     try:
+        # Get page count
+        total_pages = get_pdf_page_count(temp_path)
+        
         async with client:
             analysis_result, markdown_content = await analyze_pdf_in_batches(
                 temp_path, client, batch_size
             )
             
-            # Prepare response based on parameters
-            response_content = {
-                "markdown_content": markdown_content,
-            }
+            # Calculate processing time
+            processing_time = time.time() - start_time
             
+            # Prepare the main content
             if include_element_ids:
                 # Add IDs to elements
                 analysis_result_with_ids = add_ids_to_elements(analysis_result)
-                
-                if return_both:
-                    # Return both versions
-                    response_content["analysis_result"] = analysis_result_with_ids
-                    response_content["analysis_result_original"] = analysis_result
-                else:
-                    # Return only ID-enriched version
-                    response_content["analysis_result"] = analysis_result_with_ids
+                json_content = analysis_result_with_ids
             else:
                 # Return original without IDs
-                response_content["analysis_result"] = analysis_result
+                json_content = analysis_result
+            
+            # Build response with unified format
+            response_content = {
+                "markdown_content": markdown_content,
+                "json_content": json_content,
+                "metadata": {
+                    "page_count": total_pages,
+                    "processing_type": "azure_di",
+                    "processing_time": processing_time,
+                    "file_size": file_size,
+                    "filename": file.filename,
+                    "batch_size": batch_size,
+                    "element_ids_included": include_element_ids
+                }
+            }
+            
+            # Handle legacy return_both parameter if needed
+            if return_both and include_element_ids:
+                response_content["json_content_original"] = analysis_result
             
             return JSONResponse(content=response_content)
             

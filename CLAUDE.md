@@ -2,6 +2,18 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Recent Updates (2025-07-06)
+
+### Unified Extraction Endpoint Response Format
+- Both `/extract` and `/extract-local` now return the same response structure:
+  - `markdown_content`: Markdown representation of the document
+  - `json_content`: Original processor output (Azure DI or Docling format)
+  - `metadata`: Processing information including type, timing, file details
+- Breaking changes:
+  - `/extract`: `analysis_result` → `json_content`
+  - `/extract-local`: `docling_document` → `json_content`, OCR info moved to metadata
+  - Segmentation endpoints: expect `json_content` instead of `analysis_result`
+
 ## Recent Updates (2025-06-20)
 
 ### Element ID System

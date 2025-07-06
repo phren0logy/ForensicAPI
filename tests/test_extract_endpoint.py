@@ -49,16 +49,26 @@ def test_extract_basic():
     
     # Verify response structure
     assert "markdown_content" in result
-    assert "analysis_result" in result
+    assert "json_content" in result
+    assert "metadata" in result
     
     # Check that content was extracted
     assert len(result["markdown_content"]) > 0
     assert "Test PDF" in result["markdown_content"]
     
     # Verify Azure DI structure
-    analysis = result["analysis_result"]
+    analysis = result["json_content"]
     assert "content" in analysis
     assert "paragraphs" in analysis
+    
+    # Verify metadata
+    metadata = result["metadata"]
+    assert metadata["processing_type"] == "azure_di"
+    assert "page_count" in metadata
+    assert "processing_time" in metadata
+    assert "file_size" in metadata
+    assert "filename" in metadata
+    assert metadata["element_ids_included"] is True  # default
     
 
 def test_extract_with_element_ids():
@@ -72,7 +82,7 @@ def test_extract_with_element_ids():
     result = resp.json()
     
     # Check that paragraphs have IDs
-    paragraphs = result["analysis_result"].get("paragraphs", [])
+    paragraphs = result["json_content"].get("paragraphs", [])
     if paragraphs:
         assert all("_id" in p for p in paragraphs)
         # Verify ID format
@@ -93,9 +103,12 @@ def test_extract_without_element_ids():
     result = resp.json()
     
     # Check that paragraphs don't have IDs
-    paragraphs = result["analysis_result"].get("paragraphs", [])
+    paragraphs = result["json_content"].get("paragraphs", [])
     if paragraphs:
         assert all("_id" not in p for p in paragraphs)
+    
+    # Check metadata shows IDs were not included
+    assert result["metadata"]["element_ids_included"] is False
 
 
 def test_extract_return_both():
@@ -110,16 +123,16 @@ def test_extract_return_both():
     result = resp.json()
     
     # Should have both versions
-    assert "analysis_result" in result
-    assert "analysis_result_original" in result
+    assert "json_content" in result
+    assert "json_content_original" in result
     
     # ID version should have IDs
-    paragraphs_with_ids = result["analysis_result"].get("paragraphs", [])
+    paragraphs_with_ids = result["json_content"].get("paragraphs", [])
     if paragraphs_with_ids:
         assert all("_id" in p for p in paragraphs_with_ids)
     
     # Original version should not have IDs
-    paragraphs_original = result["analysis_result_original"].get("paragraphs", [])
+    paragraphs_original = result["json_content_original"].get("paragraphs", [])
     if paragraphs_original:
         assert all("_id" not in p for p in paragraphs_original)
 
@@ -134,7 +147,8 @@ def test_extract_custom_batch_size():
     
     assert resp.status_code == 200
     result = resp.json()
-    assert "analysis_result" in result
+    assert "json_content" in result
+    assert result["metadata"]["batch_size"] == 1
 
 
 def test_extract_invalid_file_type():
@@ -160,7 +174,8 @@ def test_extract_empty_pdf():
     # Should still succeed but with minimal content
     assert resp.status_code == 200
     result = resp.json()
-    assert "analysis_result" in result
+    assert "json_content" in result
+    assert "metadata" in result
 
 
 def test_extract_real_sample_pdf():
@@ -187,7 +202,8 @@ def test_extract_real_sample_pdf():
         
         # Should have substantial content
         assert len(result["markdown_content"]) > 1000
-        assert "analysis_result" in result
+        assert "json_content" in result
+        assert "metadata" in result
         
         # Check for proper extraction
         assert "Dracula" in result["markdown_content"] or "DRACULA" in result["markdown_content"]

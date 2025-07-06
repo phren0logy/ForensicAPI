@@ -125,7 +125,7 @@ class TestExtractionComparison:
         azure_tables = len(azure_data.get("tables", []))
         
         # Count tables in Docling format (different structure)
-        docling_doc = docling_data.get("docling_document", {})
+        docling_doc = docling_data.get("json_content", {})
         docling_tables = 0
         
         # Docling stores elements differently
@@ -163,7 +163,7 @@ class TestExtractionComparison:
         }
         
         # Document Docling structure
-        docling_doc = docling_data.get("docling_document", {})
+        docling_doc = docling_data.get("json_content", {})
         docling_structure = {
             "top_level_keys": sorted(docling_data.keys()),
             "has_pages": "pages" in docling_doc,

@@ -67,14 +67,14 @@ def test_full_pipeline_extract_segment_filter():
     extract_result = extract_resp.json()
     
     # Verify extraction worked
-    assert "analysis_result" in extract_result
+    assert "json_content" in extract_result
     assert "markdown_content" in extract_result
     assert "Chapter 1" in extract_result["markdown_content"]
     
     # Step 2: Segment the extracted content
     segment_payload = {
         "source_file": "test_document.pdf",
-        "analysis_result": extract_result["analysis_result"],
+        "json_content": extract_result["json_content"],
         "min_segment_tokens": 100,  # Small for testing
         "max_segment_tokens": 500
     }
@@ -92,7 +92,7 @@ def test_full_pipeline_extract_segment_filter():
     # Step 3: Filter and segment in one operation
     filter_segment_payload = {
         "source_file": "test_document.pdf",
-        "analysis_result": extract_result["analysis_result"],
+        "json_content": extract_result["json_content"],
         "filter_config": {
             "filter_preset": "llm_ready",
             "include_element_ids": True
@@ -133,7 +133,7 @@ def test_pipeline_with_anonymization():
     
     # Step 2: Anonymize the extracted content
     anonymize_payload = {
-        "azure_di_json": extract_result["analysis_result"],
+        "azure_di_json": extract_result["json_content"],
         "config": {
             "score_threshold": 0.5,
             "entity_types": ["PERSON", "EMAIL_ADDRESS", "PHONE_NUMBER"]
@@ -155,7 +155,7 @@ def test_pipeline_with_anonymization():
     # Step 3: Segment the anonymized content
     segment_payload = {
         "source_file": "medical_record_anonymized.pdf",
-        "analysis_result": anonymize_result["anonymized_json"],
+        "json_content": anonymize_result["anonymized_json"],
         "min_segment_tokens": 100,
         "max_segment_tokens": 500
     }
@@ -186,7 +186,7 @@ def test_pipeline_with_different_filter_presets():
     for preset in presets:
         filter_payload = {
             "source_file": "test.pdf",
-            "analysis_result": extract_result["analysis_result"],
+            "json_content": extract_result["json_content"],
             "filter_config": {
                 "filter_preset": preset,
                 "include_element_ids": True
@@ -216,7 +216,7 @@ def test_pipeline_error_handling():
     
     # Test with invalid data at each step
     
-    # 1. Invalid segmentation input (missing analysis_result)
+    # 1. Invalid segmentation input (missing json_content)
     segment_payload = {
         "source_file": "test.pdf",
         "min_segment_tokens": 100
@@ -227,7 +227,7 @@ def test_pipeline_error_handling():
     # 2. Invalid filter config
     filter_payload = {
         "source_file": "test.pdf",
-        "analysis_result": {"content": "test"},
+        "json_content": {"content": "test"},
         "filter_config": {
             "filter_preset": "invalid_preset"
         }
@@ -278,7 +278,7 @@ def test_large_document_pipeline():
     # Segment and filter
     filter_payload = {
         "source_file": "large_test.pdf",
-        "analysis_result": extract_result["analysis_result"],
+        "json_content": extract_result["json_content"],
         "filter_config": {
             "filter_preset": "llm_ready"
         },

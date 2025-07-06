@@ -9,6 +9,7 @@ documents using ocrmac on macOS and EasyOCR on other platforms.
 import os
 import platform
 import tempfile
+import time
 from typing import Optional
 
 from docling.datamodel.pipeline_options import (
@@ -79,6 +80,9 @@ async def extract_local(
             },
         )
 
+    # Start timing
+    start_time = time.time()
+    
     # Platform-specific OCR availability check
     if ocr_enabled and platform.system() == "Darwin":
         try:
@@ -92,9 +96,14 @@ async def extract_local(
                 },
             )
 
+    # Get file size
+    file_size = file.size if file.size else 0
+    
     # Save uploaded file temporarily
     with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as temp_file:
         contents = await file.read()
+        if file_size == 0:  # If size wasn't available before reading
+            file_size = len(contents)
         temp_file.write(contents)
         temp_file.flush()
         temp_path = temp_file.name
@@ -127,18 +136,26 @@ async def extract_local(
         markdown_content = result.document.export_to_markdown()
         docling_json = result.document.export_to_dict()
 
-        # Add metadata about processing
+        # Calculate processing time
+        processing_time = time.time() - start_time
+        
+        # Get page count from Docling structure
+        page_count = len(docling_json.get("pages", {}))
+
+        # Build response with unified format
         response_data = {
             "markdown_content": markdown_content,
-            "docling_document": docling_json,
-            "ocr_applied": ocr_applied,
+            "json_content": docling_json,  # Renamed from docling_document
             "metadata": {
+                "page_count": page_count,
+                "processing_type": "docling",
+                "processing_time": processing_time,
+                "file_size": file_size,
                 "filename": file.filename,
-                "file_size_bytes": file.size,
+                "ocr_applied": ocr_applied,
                 "ocr_enabled": ocr_enabled,
-                "ocr_platform": "ocrmac" if platform.system() == "Darwin" else "easyocr",
-                "pages_processed": len(docling_json.get("pages", {})),
-            },
+                "ocr_platform": "ocrmac" if platform.system() == "Darwin" else "easyocr"
+            }
         }
 
         return JSONResponse(content=response_data)
