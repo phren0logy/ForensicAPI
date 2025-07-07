@@ -126,17 +126,23 @@ uv run run.py
 
 ### `/extract` (POST)
 
-- **Description:** Extracts structured data and markdown from PDF documents using Azure Document Intelligence with intelligent batch processing. Implements Phase 1 of the PDF processing strategy with perfect document reconstruction for documents of any size.
+- **Description:** Extracts structured data and markdown from PDF documents using Azure Document Intelligence with intelligent batch processing and optional segmentation. Implements Phase 1 of the PDF processing strategy with perfect document reconstruction for documents of any size. Can automatically segment results into semantically meaningful chunks for LLM processing.
 - **Request:**
   - `multipart/form-data` with the following fields:
     - `file`: PDF file to process (required)
     - `batch_size`: Number of pages per batch (optional, default: 1500)
     - `include_element_ids`: Add unique IDs to all elements (optional, default: true)
     - `return_both`: Return both original and ID-enriched versions (optional, default: false)
+    - `enable_segmentation`: Enable automatic segmentation of results (optional, default: false)
+    - `segment_min_tokens`: Minimum tokens per segment (optional, default: 10000)
+    - `segment_max_tokens`: Maximum tokens per segment (optional, default: 30000)
 - **Advanced Features:**
   - **Intelligent Batch Processing**: Automatically processes large documents in configurable page batches
   - **Perfect Stitching**: Reconstructs complete documents with 100% accuracy using advanced stitching algorithms
   - **Element ID Generation**: Automatically adds stable `_id` fields to all elements for tracking through filtering/segmentation
+  - **Automatic Segmentation**: Optional segmentation into semantically meaningful chunks respecting document structure
+  - **Token-Based Control**: Configurable min/max tokens per segment for optimal LLM context window usage
+  - **Structural Awareness**: Segments break at logical boundaries (H1/H2 headings) while maintaining context
   - **Automatic Offset Calculation**: Seamlessly handles page numbering and content offsets across batches
   - **Concurrent Processing**: Processes multiple batches simultaneously for optimal performance
   - **Input Validation**: Comprehensive validation of Azure DI structure and batch sequences
@@ -150,7 +156,7 @@ uv run run.py
     ```json
     {
       "markdown_content": "Complete markdown of entire document",
-      "analysis_result": {
+      "json_content": {
         "content": "Full document content...",
         "paragraphs": [
           {
@@ -175,12 +181,48 @@ uv run run.py
           }
         ],
         // ... other elements with _id fields
+      },
+      "segments": [  // Only present when enable_segmentation=true
+        {
+          "segment_id": 1,
+          "source_file": "document.pdf",
+          "token_count": 12543,
+          "structural_context": {
+            "h1": "Chapter 1",
+            "h2": "Section A",
+            "h3": null,
+            "h4": null,
+            "h5": null,
+            "h6": null
+          },
+          "elements": [
+            // Azure DI elements in this segment
+          ]
+        }
+        // ... more segments
+      ],
+      "metadata": {
+        "page_count": 10,
+        "processing_type": "azure_di",
+        "processing_time": 2.5,
+        "file_size": 1048576,
+        "filename": "document.pdf",
+        "batch_size": 1500,
+        "element_ids_included": true,
+        // Segmentation metadata (when enabled)
+        "segmentation_enabled": true,
+        "segment_count": 3,
+        "segment_config": {
+          "min_tokens": 10000,
+          "max_tokens": 30000
+        }
       }
     }
     ```
   - When `include_element_ids=true` (default): Returns Azure DI format with added `_id` fields
   - When `include_element_ids=false`: Returns pure Azure DI format without IDs
-  - When `return_both=true`: Returns both `analysis_result` (with IDs) and `analysis_result_original` (without IDs)
+  - When `return_both=true`: Returns both `json_content` (with IDs) and `json_content_original` (without IDs)
+  - When `enable_segmentation=true`: Includes `segments` array with document broken into semantically meaningful chunks
 
 ### `/extract-local` (POST)
 
@@ -714,6 +756,32 @@ curl -X POST http://localhost:8000/extract \
   -F "batch_size=1500" \
   -F "include_element_ids=true" \
   > extracted_result.json
+```
+
+### Alternative: Extract with Automatic Segmentation
+
+```bash
+# Extract and segment PDF for direct LLM processing
+curl -X POST http://localhost:8000/extract \
+  -F "file=@large_document.pdf" \
+  -F "enable_segmentation=true" \
+  -F "segment_min_tokens=10000" \
+  -F "segment_max_tokens=30000" \
+  > segmented_result.json
+
+# Result includes both full content and segments:
+# {
+#   "markdown_content": "Full document...",
+#   "json_content": { ... },
+#   "segments": [
+#     {
+#       "segment_id": 1,
+#       "token_count": 15234,
+#       "structural_context": { "h1": "Chapter 1", ... },
+#       "elements": [ ... ]
+#     }
+#   ]
+# }
 ```
 
 ### Alternative: Local Extraction with Chunking

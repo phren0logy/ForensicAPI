@@ -17,6 +17,9 @@ from fastapi.responses import JSONResponse
 from pypdf import PdfReader
 from utils import ensure_env_loaded
 
+# Import segmentation functionality
+from .segmentation import create_rich_segments
+
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
@@ -375,27 +378,36 @@ async def extract(
     file: UploadFile = File(...), 
     batch_size: int = Form(1500),
     include_element_ids: bool = Form(True),
-    return_both: bool = Form(False)
+    return_both: bool = Form(False),
+    # New segmentation parameters
+    enable_segmentation: bool = Form(False),
+    segment_min_tokens: int = Form(10000),
+    segment_max_tokens: int = Form(30000)
 ):
     """
-    Extracts structured data and markdown from a PDF document.
+    Extracts structured data and markdown from a PDF document with optional segmentation.
 
     This endpoint processes the PDF in batches, then intelligently stitches the
     results to form a single, cohesive analysis object that is identical to
-    the output of a single API call on the entire document.
+    the output of a single API call on the entire document. Optionally segments
+    the result into semantically meaningful chunks for LLM processing.
     
     Args:
         file: PDF file to process
         batch_size: Number of pages per batch (default: 1500)
         include_element_ids: Add unique _id fields to all elements (default: True)
         return_both: Return both original and ID-enriched versions (default: False)
+        enable_segmentation: Enable automatic segmentation of results (default: False)
+        segment_min_tokens: Minimum tokens per segment (default: 10000)
+        segment_max_tokens: Maximum tokens per segment (default: 30000)
     """
     start_time = time.time()
     
     logger.info(
         f"/extract endpoint called for file: {file.filename}, "
         f"batch_size: {batch_size}, include_element_ids: {include_element_ids}, "
-        f"return_both: {return_both}"
+        f"return_both: {return_both}, enable_segmentation: {enable_segmentation}, "
+        f"segment_min_tokens: {segment_min_tokens}, segment_max_tokens: {segment_max_tokens}"
     )
     ensure_env_loaded()
     endpoint = os.getenv("AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT")
@@ -456,6 +468,35 @@ async def extract(
                     "element_ids_included": include_element_ids
                 }
             }
+            
+            # Apply segmentation if enabled
+            if enable_segmentation:
+                try:
+                    # Create segments using the existing segmentation logic
+                    segments = create_rich_segments(
+                        json_content,
+                        file.filename,
+                        segment_min_tokens,
+                        segment_max_tokens
+                    )
+                    
+                    # Add segments to response
+                    response_content["segments"] = [segment.model_dump() for segment in segments]
+                    
+                    # Update metadata with segmentation info
+                    response_content["metadata"]["segmentation_enabled"] = True
+                    response_content["metadata"]["segment_count"] = len(segments)
+                    response_content["metadata"]["segment_config"] = {
+                        "min_tokens": segment_min_tokens,
+                        "max_tokens": segment_max_tokens
+                    }
+                except Exception as e:
+                    logger.error(f"Segmentation failed: {e}", exc_info=True)
+                    # Continue without segmentation rather than failing the entire request
+                    response_content["metadata"]["segmentation_enabled"] = False
+                    response_content["metadata"]["segmentation_error"] = str(e)
+            else:
+                response_content["metadata"]["segmentation_enabled"] = False
             
             # Handle legacy return_both parameter if needed
             if return_both and include_element_ids:

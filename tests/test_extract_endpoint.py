@@ -207,3 +207,153 @@ def test_extract_real_sample_pdf():
         
         # Check for proper extraction
         assert "Dracula" in result["markdown_content"] or "DRACULA" in result["markdown_content"]
+
+
+def test_extract_with_segmentation_basic():
+    """Test extraction with segmentation enabled."""
+    # Create a multi-page PDF with enough content for segmentation
+    buffer = io.BytesIO()
+    c = canvas.Canvas(buffer, pagesize=letter)
+    
+    # Page 1 - Introduction
+    c.setFont("Helvetica-Bold", 16)
+    c.drawString(100, 700, "Introduction")
+    c.setFont("Helvetica", 12)
+    for i in range(20):
+        c.drawString(100, 650 - i*20, f"This is paragraph {i+1} of the introduction section.")
+    c.showPage()
+    
+    # Page 2 - Chapter 1
+    c.setFont("Helvetica-Bold", 16)
+    c.drawString(100, 700, "Chapter 1: Overview")
+    c.setFont("Helvetica", 12)
+    for i in range(20):
+        c.drawString(100, 650 - i*20, f"This is paragraph {i+1} of chapter 1.")
+    c.showPage()
+    
+    # Page 3 - Chapter 2
+    c.setFont("Helvetica-Bold", 16)
+    c.drawString(100, 700, "Chapter 2: Details")
+    c.setFont("Helvetica", 12)
+    for i in range(20):
+        c.drawString(100, 650 - i*20, f"This is paragraph {i+1} of chapter 2.")
+    c.showPage()
+    
+    c.save()
+    buffer.seek(0)
+    
+    files = {"file": ("test_segmentation.pdf", buffer.read(), "application/pdf")}
+    data = {
+        "enable_segmentation": "true",
+        "segment_min_tokens": "100",
+        "segment_max_tokens": "1000"
+    }
+    
+    resp = client.post("/extract", files=files, data=data)
+    assert resp.status_code == 200
+    result = resp.json()
+    
+    # Verify segmentation is present
+    assert "segments" in result
+    assert isinstance(result["segments"], list)
+    assert len(result["segments"]) > 0
+    
+    # Verify segment structure
+    first_segment = result["segments"][0]
+    assert "segment_id" in first_segment
+    assert "source_file" in first_segment
+    assert "token_count" in first_segment
+    assert "structural_context" in first_segment
+    assert "elements" in first_segment
+    
+    # Verify metadata includes segmentation info
+    metadata = result["metadata"]
+    assert metadata["segmentation_enabled"] is True
+    assert "segment_count" in metadata
+    assert metadata["segment_count"] == len(result["segments"])
+    assert "segment_config" in metadata
+    assert metadata["segment_config"]["min_tokens"] == 100
+    assert metadata["segment_config"]["max_tokens"] == 1000
+
+
+def test_extract_segmentation_disabled():
+    """Test that segmentation is disabled by default."""
+    pdf_content = create_test_pdf(num_pages=2)
+    
+    files = {"file": ("test.pdf", pdf_content, "application/pdf")}
+    # Don't specify enable_segmentation (defaults to False)
+    resp = client.post("/extract", files=files)
+    
+    assert resp.status_code == 200
+    result = resp.json()
+    
+    # Segments should not be present
+    assert "segments" not in result
+    assert result["metadata"]["segmentation_enabled"] is False
+
+
+def test_extract_segmentation_token_limits():
+    """Test that segmentation respects token limits."""
+    # Create a PDF with varied content lengths
+    buffer = io.BytesIO()
+    c = canvas.Canvas(buffer, pagesize=letter)
+    
+    # Add multiple sections with different content lengths
+    for i in range(5):
+        c.setFont("Helvetica-Bold", 14)
+        c.drawString(100, 700, f"Section {i+1}")
+        c.setFont("Helvetica", 12)
+        
+        # Add varying amounts of content
+        y_pos = 650
+        for j in range(10 + i * 5):  # Increasing content per section
+            text = f"Line {j+1}: This is sample text content for testing segmentation behavior. " * 3
+            c.drawString(100, y_pos, text[:100])  # Truncate to fit on page
+            y_pos -= 20
+            if y_pos < 100:
+                break
+        c.showPage()
+    
+    c.save()
+    buffer.seek(0)
+    
+    files = {"file": ("test_limits.pdf", buffer.read(), "application/pdf")}
+    data = {
+        "enable_segmentation": "true",
+        "segment_min_tokens": "500",
+        "segment_max_tokens": "2000"
+    }
+    
+    resp = client.post("/extract", files=files, data=data)
+    assert resp.status_code == 200
+    result = resp.json()
+    
+    # Verify all segments respect token limits
+    for segment in result["segments"]:
+        assert segment["token_count"] <= 2000
+        # Note: min_tokens is a soft limit, so very small documents might have smaller segments
+
+
+def test_extract_segmentation_with_element_ids():
+    """Test segmentation preserves element IDs."""
+    pdf_content = create_test_pdf(num_pages=3)
+    
+    files = {"file": ("test.pdf", pdf_content, "application/pdf")}
+    data = {
+        "include_element_ids": "true",
+        "enable_segmentation": "true",
+        "segment_min_tokens": "50",
+        "segment_max_tokens": "500"
+    }
+    
+    resp = client.post("/extract", files=files, data=data)
+    assert resp.status_code == 200
+    result = resp.json()
+    
+    # Verify elements in segments have IDs
+    assert "segments" in result
+    for segment in result["segments"]:
+        for element in segment["elements"]:
+            # Element IDs should be present when include_element_ids is true
+            if "content" in element:  # Only elements with content get IDs
+                assert "_id" in element
