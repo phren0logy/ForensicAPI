@@ -4,6 +4,8 @@ This is a tool to facilitate LLM experiments with PDFs, especially those that co
 
 This application provides an API that uses Azure Document Intelligence to convert PDFs to Markdown and structured JSON, handling PDFs of arbitrary size (rather than being limited to Azure's single-request limit of 2000 pages). The system preserves document structure through intelligent segmentation that maintains hierarchical heading context (H1-H6). Every JSON element is automatically assigned a unique ID for tracing back to the source document. The filtering endpoint facilitates stripping out unnecessary JSON components to optimize for LLM token usage.
 
+Additionally, the application offers local document processing through Docling, enabling privacy-sensitive operations without external API calls. This includes intelligent document chunking for RAG applications, with semantic segmentation that respects document structure and maintains hierarchical context within each chunk.
+
 There is also an endpoint to anonymize documents using LLM-Guard with the AI4Privacy BERT model for comprehensive PII detection (54 entity types with 97.8% F1 score), as well as an endpoint to compose prompts around large documents with instructions and the beginning and the end (as recommended by the GPT-4.1 documentation).
 
 ## Test the Endpoints
@@ -25,6 +27,7 @@ FastAPI provides automatic interactive API documentation:
    ```
 
 2. **Visit the interactive documentation:**
+
    - [Swagger UI](http://127.0.0.1:8000/docs) - Interactive API testing
    - [ReDoc](http://127.0.0.1:8000/redoc) - Alternative API documentation
 
@@ -65,6 +68,7 @@ LOG_LEVEL=INFO
 ### Key Dependencies
 
 - **[Azure Document Intelligence](https://azure.microsoft.com/en-us/products/ai-services/ai-document-intelligence/)**: Enterprise-grade PDF to structured data extraction
+- **[Docling](https://github.com/DS4SD/docling)**: Local document processing with intelligent chunking and OCR support
 - **[LLM-Guard](https://llm-guard.com/)**: Advanced PII detection and anonymization with AI4Privacy BERT model (54 PII types)
 - **[FastAPI](https://fastapi.tiangolo.com/)**: Modern, fast web framework with automatic API documentation
 - **[UV](https://github.com/astral-sh/uv)**: Ultra-fast Python package and project management
@@ -177,6 +181,97 @@ uv run run.py
   - When `include_element_ids=true` (default): Returns Azure DI format with added `_id` fields
   - When `include_element_ids=false`: Returns pure Azure DI format without IDs
   - When `return_both=true`: Returns both `analysis_result` (with IDs) and `analysis_result_original` (without IDs)
+
+### `/extract-local` (POST)
+
+- **Description:** Extracts structured data and markdown from documents locally using Docling, without requiring external API calls. Supports intelligent document chunking for RAG pipelines and LLM applications. Processes PDFs, DOCX, PPTX, HTML, and MD files with optional OCR support.
+- **Request:**
+  - `multipart/form-data` with the following fields:
+    - `file`: Document file to process (required)
+    - `ocr_enabled`: Enable OCR for scanned content (optional, default: true)
+    - `ocr_lang`: OCR language code (optional, default: "en")
+    - `max_pages`: Maximum number of pages to process (optional)
+    - `enable_chunking`: Enable intelligent document chunking (optional, default: false)
+    - `chunk_min_tokens`: Minimum tokens per chunk (optional, default: 1000)
+    - `chunk_max_tokens`: Maximum tokens per chunk (optional, default: 30000)
+    - `merge_peers`: Merge sibling elements when possible (optional, default: true)
+- **Features:**
+  - **Local Processing**: No data sent to external services, ensuring complete privacy
+  - **OCR Support**:
+    - macOS: Uses native Vision framework via ocrmac (fast, accurate)
+    - Other platforms: Falls back to EasyOCR
+  - **Intelligent Chunking** (when enabled):
+    - Semantic segmentation respecting document structure (headings, paragraphs, tables)
+    - Token-based size control using tiktoken with GPT-4's cl100k_base encoding
+    - Hierarchical context preservation in each chunk
+    - Rich metadata including source references and page locations
+  - **Format Support**: PDF, DOCX, DOC, PPTX, HTML, MD
+  - **No Page Limits**: Processes complete documents without Azure's 2000-page restriction
+- **Response:**
+  - A JSON object containing:
+    ```json
+    {
+      "markdown_content": "Complete document in markdown format",
+      "json_content": {
+        // Native Docling document structure
+      },
+      "chunks": [
+        // Only present when chunking is enabled
+        {
+          "text": "Section 1 > Subsection 1.1\n\nThe actual chunk content with context...",
+          "token_count": 1250,
+          "meta": {
+            "doc_items": [
+              {
+                "self_ref": "#/texts/28",
+                "label": "text",
+                "prov": [
+                  {
+                    "page_no": 2,
+                    "bbox": {
+                      "l": 53.29,
+                      "t": 287.14,
+                      "r": 295.56,
+                      "b": 212.37
+                    }
+                  }
+                ]
+              }
+            ],
+            "headings": ["Section 1", "Subsection 1.1"],
+            "origin": {
+              "filename": "document.pdf"
+            }
+          }
+        }
+        // ... more chunks
+      ],
+      "metadata": {
+        "page_count": 10,
+        "processing_type": "docling",
+        "processing_time": 2.5,
+        "file_size": 1048576,
+        "filename": "document.pdf",
+        "ocr_applied": false,
+        "ocr_enabled": true,
+        "ocr_platform": "ocrmac",
+        // Chunking metadata (when enabled)
+        "chunk_count": 15,
+        "chunking_enabled": true,
+        "chunk_config": {
+          "min_tokens": 1000,
+          "max_tokens": 30000,
+          "tokenizer": "tiktoken-cl100k_base",
+          "merge_peers": true
+        }
+      }
+    }
+    ```
+- **Chunking Use Cases:**
+  - **RAG Applications**: Create optimal chunks for vector database ingestion
+  - **LLM Context Windows**: Ensure chunks fit within model token limits
+  - **Semantic Search**: Maintain document structure for better retrieval
+  - **Document Q&A**: Preserve section hierarchy for contextual understanding
 
 ### `/segment` (POST)
 
@@ -383,7 +478,10 @@ uv run run.py
         "return_decision_process": false
       },
       "vault_data": [
-        /* Optional: Previous vault data for consistent replacements */ ["John Doe", "Jane Smith"],
+        /* Optional: Previous vault data for consistent replacements */ [
+          "John Doe",
+          "Jane Smith"
+        ],
         ["_date_offset", "-365"]
       ]
     }
@@ -618,6 +716,27 @@ curl -X POST http://localhost:8000/extract \
   > extracted_result.json
 ```
 
+### Alternative: Local Extraction with Chunking
+
+```bash
+# Extract and chunk locally for RAG applications
+curl -X POST http://localhost:8000/extract-local \
+  -F "file=@document.pdf" \
+  -F "enable_chunking=true" \
+  -F "chunk_min_tokens=1000" \
+  -F "chunk_max_tokens=3000" \
+  > chunked_result.json
+
+# Each chunk includes contextual hierarchy:
+# {
+#   "chunks": [{
+#     "text": "Chapter 1 > Section A\n\nActual content...",
+#     "token_count": 2543,
+#     "meta": { ... }
+#   }]
+# }
+```
+
 ### 2. Filter and Segment for LLM Processing
 
 ```bash
@@ -691,18 +810,22 @@ curl -X POST http://localhost:8000/compose-prompt \
 ### Common Errors and Solutions
 
 - **413 Request Entity Too Large**
+
   - Solution: Reduce the `batch_size` parameter in `/extract`
   - Default file size limit can be increased in server configuration
 
 - **Azure DI Timeout (504 Gateway Timeout)**
+
   - Large PDFs may exceed Azure's processing time
   - Solution: Use smaller batch sizes (e.g., 500-1000 pages)
 
 - **Memory Errors**
+
   - For documents with many tables or complex layouts
   - Solution: Process in smaller segments or increase server memory
 
 - **AI4Privacy Model Loading Errors**
+
   - LLM-Guard will download the AI4Privacy model on first use
   - Solution: Ensure internet connectivity for model download (~134MB)
 

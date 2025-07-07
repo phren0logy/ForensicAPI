@@ -21,6 +21,15 @@ from main import app
 
 client = TestClient(app)
 
+# Check if chunking dependencies are available
+try:
+    import tiktoken
+    from docling_core.transforms.chunker.tokenizer.openai import OpenAITokenizer
+    from docling.chunking import HybridChunker
+    CHUNKING_AVAILABLE = True
+except ImportError:
+    CHUNKING_AVAILABLE = False
+
 
 def create_test_pdf(num_pages: int = 2, text_content: str = None) -> bytes:
     """Create a simple test PDF with specified number of pages."""
@@ -242,3 +251,241 @@ def test_extract_local_real_scanned_pdf():
         assert len(result["markdown_content"]) > 100  # Should have substantial content
     else:
         pytest.skip("Scanned PDF test fixture not found")
+
+
+# Chunking tests
+@pytest.mark.skipif(not CHUNKING_AVAILABLE, reason="Chunking dependencies not installed")
+def test_extract_local_with_chunking_basic():
+    """Test basic chunking functionality."""
+    # Create a multi-page PDF with sections
+    buffer = io.BytesIO()
+    c = canvas.Canvas(buffer, pagesize=letter)
+    
+    # Page 1 - Introduction
+    c.drawString(100, 700, "# Introduction")
+    c.drawString(100, 650, "This is the introduction section with some content.")
+    c.drawString(100, 600, "It contains multiple paragraphs of text that should be chunked.")
+    c.showPage()
+    
+    # Page 2 - Section 1
+    c.drawString(100, 700, "## Section 1: Overview")
+    c.drawString(100, 650, "This is section 1 with detailed information.")
+    c.drawString(100, 600, "It has enough content to potentially form its own chunk.")
+    c.showPage()
+    
+    # Page 3 - Section 2
+    c.drawString(100, 700, "## Section 2: Details") 
+    c.drawString(100, 650, "Section 2 contains additional details and explanations.")
+    c.drawString(100, 600, "This content might be merged with other sections depending on token limits.")
+    c.showPage()
+    
+    c.save()
+    buffer.seek(0)
+    
+    files = {"file": ("test_chunking.pdf", buffer.read(), "application/pdf")}
+    data = {
+        "enable_chunking": "true",
+        "chunk_min_tokens": "50",
+        "chunk_max_tokens": "500"
+    }
+    
+    resp = client.post("/extract-local", files=files, data=data)
+    assert resp.status_code == 200
+    result = resp.json()
+    
+    # Verify chunks are present
+    assert "chunks" in result
+    assert isinstance(result["chunks"], list)
+    assert len(result["chunks"]) > 0
+    
+    # Verify chunk structure
+    first_chunk = result["chunks"][0]
+    assert "text" in first_chunk
+    assert "token_count" in first_chunk
+    assert "meta" in first_chunk
+    
+    # Verify token count is within limits
+    assert first_chunk["token_count"] <= 500
+    
+    # Verify metadata includes chunking info
+    metadata = result["metadata"]
+    assert metadata["chunking_enabled"] is True
+    assert "chunk_count" in metadata
+    assert metadata["chunk_count"] == len(result["chunks"])
+    assert "chunk_config" in metadata
+    assert metadata["chunk_config"]["min_tokens"] == 50
+    assert metadata["chunk_config"]["max_tokens"] == 500
+    assert metadata["chunk_config"]["tokenizer"] == "tiktoken-cl100k_base"
+    assert metadata["chunk_config"]["merge_peers"] is True
+
+
+@pytest.mark.skipif(not CHUNKING_AVAILABLE, reason="Chunking dependencies not installed")
+def test_extract_local_chunking_disabled():
+    """Test that chunking is disabled by default."""
+    pdf_content = create_test_pdf(num_pages=2)
+    
+    files = {"file": ("test.pdf", pdf_content, "application/pdf")}
+    # Don't specify enable_chunking (defaults to False)
+    resp = client.post("/extract-local", files=files)
+    
+    assert resp.status_code == 200
+    result = resp.json()
+    
+    # Chunks should not be present
+    assert "chunks" not in result
+    assert "chunking_enabled" not in result.get("metadata", {})
+
+
+@pytest.mark.skipif(not CHUNKING_AVAILABLE, reason="Chunking dependencies not installed")
+def test_extract_local_chunking_token_limits():
+    """Test chunking respects token limits."""
+    # Create a PDF with varied content lengths
+    buffer = io.BytesIO()
+    c = canvas.Canvas(buffer, pagesize=letter)
+    
+    # Add multiple pages with different content lengths
+    for i in range(5):
+        c.drawString(100, 700, f"# Section {i+1}")
+        # Add varying amounts of content
+        y_pos = 650
+        for j in range(10 + i * 5):  # Increasing content per page
+            c.drawString(100, y_pos, f"Line {j+1}: This is sample text content for testing chunking behavior.")
+            y_pos -= 20
+            if y_pos < 100:
+                break
+        c.showPage()
+    
+    c.save()
+    buffer.seek(0)
+    
+    files = {"file": ("test_limits.pdf", buffer.read(), "application/pdf")}
+    data = {
+        "enable_chunking": "true",
+        "chunk_min_tokens": "100",
+        "chunk_max_tokens": "1000"
+    }
+    
+    resp = client.post("/extract-local", files=files, data=data)
+    assert resp.status_code == 200
+    result = resp.json()
+    
+    # Verify all chunks respect token limits
+    for chunk in result["chunks"]:
+        assert chunk["token_count"] <= 1000
+        # Note: min_tokens is a soft limit, so very small documents might have smaller chunks
+
+
+@pytest.mark.skipif(not CHUNKING_AVAILABLE, reason="Chunking dependencies not installed")
+def test_extract_local_chunking_merge_peers():
+    """Test peer merging functionality."""
+    pdf_content = create_test_pdf(num_pages=3)
+    
+    # Test with merge_peers disabled
+    files = {"file": ("test.pdf", pdf_content, "application/pdf")}
+    data = {
+        "enable_chunking": "true",
+        "chunk_min_tokens": "50",
+        "chunk_max_tokens": "500",
+        "merge_peers": "false"
+    }
+    
+    resp = client.post("/extract-local", files=files, data=data)
+    assert resp.status_code == 200
+    result_no_merge = resp.json()
+    
+    # Test with merge_peers enabled (default)
+    files = {"file": ("test.pdf", pdf_content, "application/pdf")}
+    data = {
+        "enable_chunking": "true",
+        "chunk_min_tokens": "50",
+        "chunk_max_tokens": "500"
+    }
+    
+    resp = client.post("/extract-local", files=files, data=data)
+    assert resp.status_code == 200
+    result_merge = resp.json()
+    
+    # Verify merge_peers setting is reflected in metadata
+    assert result_no_merge["metadata"]["chunk_config"]["merge_peers"] is False
+    assert result_merge["metadata"]["chunk_config"]["merge_peers"] is True
+
+
+@pytest.mark.skipif(not CHUNKING_AVAILABLE, reason="Chunking dependencies not installed")
+def test_extract_local_chunking_metadata():
+    """Test chunk metadata structure."""
+    pdf_content = create_test_pdf(num_pages=2)
+    
+    files = {"file": ("test.pdf", pdf_content, "application/pdf")}
+    data = {
+        "enable_chunking": "true",
+        "chunk_min_tokens": "50",
+        "chunk_max_tokens": "300"
+    }
+    
+    resp = client.post("/extract-local", files=files, data=data)
+    assert resp.status_code == 200
+    result = resp.json()
+    
+    # Verify chunk metadata
+    for chunk in result["chunks"]:
+        meta = chunk["meta"]
+        assert isinstance(meta, dict)
+        
+        # Check for expected metadata fields
+        if "doc_items" in meta:
+            assert isinstance(meta["doc_items"], list)
+            for item in meta["doc_items"]:
+                assert "self_ref" in item
+                assert "label" in item
+                
+        if "headings" in meta:
+            assert isinstance(meta["headings"], list)
+            
+        if "origin" in meta:
+            assert "filename" in meta["origin"]
+
+
+@pytest.mark.skipif(not CHUNKING_AVAILABLE, reason="Chunking dependencies not installed")
+def test_extract_local_chunking_with_ocr():
+    """Test chunking combined with OCR."""
+    pdf_content = create_test_pdf(num_pages=2)
+    
+    files = {"file": ("test.pdf", pdf_content, "application/pdf")}
+    data = {
+        "ocr_enabled": "true",
+        "enable_chunking": "true",
+        "chunk_min_tokens": "50",
+        "chunk_max_tokens": "500"
+    }
+    
+    resp = client.post("/extract-local", files=files, data=data)
+    assert resp.status_code == 200
+    result = resp.json()
+    
+    # Verify both OCR and chunking were applied
+    assert result["metadata"]["ocr_enabled"] is True
+    assert result["metadata"]["chunking_enabled"] is True
+    assert "chunks" in result
+    assert len(result["chunks"]) > 0
+
+
+@pytest.mark.skipif(CHUNKING_AVAILABLE, reason="Testing missing dependencies")
+def test_extract_local_chunking_missing_deps():
+    """Test error handling when chunking dependencies are missing."""
+    pdf_content = create_test_pdf(num_pages=1)
+    
+    files = {"file": ("test.pdf", pdf_content, "application/pdf")}
+    data = {
+        "enable_chunking": "true"
+    }
+    
+    resp = client.post("/extract-local", files=files, data=data)
+    
+    # Should fail gracefully if dependencies are missing
+    if resp.status_code == 500:
+        result = resp.json()
+        assert "error" in result
+        assert "Chunking dependencies not installed" in result["error"]
+    else:
+        # If dependencies are actually installed, test should pass
+        assert resp.status_code == 200

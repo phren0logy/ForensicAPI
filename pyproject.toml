@@ -26,6 +26,7 @@ dependencies = [
     "llm-guard>=0.3.16",
     "docling>=2.39.0",
     "ocrmac>=1.0.0",
+    "docling-core[chunking-openai]>=2.39.0",
 ]
 
 [dependency-groups]
