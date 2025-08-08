@@ -56,8 +56,8 @@ The application requires Azure Document Intelligence credentials. Create a `.env
 
 ```env
 # Azure Document Intelligence Configuration
-AZURE_DI_ENDPOINT=https://your-resource-name.cognitiveservices.azure.com/
-AZURE_DI_KEY=your-api-key-here
+AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT=https://your-resource-name.cognitiveservices.azure.com/
+AZURE_DOCUMENT_INTELLIGENCE_KEY=your-api-key-here
 
 # Optional: Logging level (DEBUG, INFO, WARNING, ERROR)
 LOG_LEVEL=INFO
@@ -323,7 +323,7 @@ uv run run.py
     ```json
     {
       "source_file": "document.pdf",
-      "analysis_result": { "... complete Azure DI analysis result ..." },
+      "json_content": { "... complete Azure DI analysis result ..." },
       "min_segment_tokens": 10000,
       "max_segment_tokens": 30000
     }
@@ -375,7 +375,7 @@ uv run run.py
     ```json
     {
       "source_file": "document.pdf",
-      "analysis_result": { "... Azure DI result with _id fields ..." },
+      "json_content": { "... Azure DI result with _id fields ..." },
       "filter_config": {
         "filter_preset": "llm_ready",
         "include_element_ids": true
@@ -437,7 +437,10 @@ uv run run.py
           ]
         }
       ],
-      "element_mappings": [...],  // Maps filtered elements back to originals
+      "element_mappings": [
+        [ /* mappings for segment 1 */ ],
+        [ /* mappings for segment 2 */ ]
+      ],
       "metrics": {
         "original_size_bytes": 500000,
         "filtered_size_bytes": 150000,
@@ -813,7 +816,7 @@ curl -X POST http://localhost:8000/segment-filtered \
   -H "Content-Type: application/json" \
   -d '{
     "source_file": "confidential_document.pdf",
-    "analysis_result": '$(cat extracted_result.json | jq .analysis_result)',
+    "json_content": '$(cat extracted_result.json | jq .json_content)',
     "filter_config": {
       "filter_preset": "llm_ready",
       "include_element_ids": true
@@ -831,7 +834,7 @@ curl -X POST http://localhost:8000/segment-filtered \
 curl -X POST http://localhost:8000/anonymization/anonymize-azure-di \
   -H "Content-Type: application/json" \
   -d '{
-    "azure_di_json": '$(cat extracted_result.json | jq .analysis_result)',
+    "azure_di_json": '$(cat extracted_result.json | jq .json_content)',
     "config": {
       "entity_types": ["PERSON", "EMAIL_ADDRESS", "PHONE_NUMBER", "US_SSN"],
       "pattern_sets": ["legal", "medical"],  # Enable domain-specific patterns
