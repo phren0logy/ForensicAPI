@@ -19,17 +19,7 @@ from docling.datamodel.pipeline_options import (
 )
 from docling.datamodel.base_models import ConversionStatus
 from docling.document_converter import DocumentConverter
-from fastapi import APIRouter, File, Form, UploadFile
-from fastapi.responses import JSONResponse
-
-# Chunking imports
-try:
-    import tiktoken
-    from docling_core.transforms.chunker.tokenizer.openai import OpenAITokenizer
-    from docling.chunking import HybridChunker
-    CHUNKING_AVAILABLE = True
-except ImportError:
-    CHUNKING_AVAILABLE = False
+from fastapi import APIRouter, File, Form, UploadFile, HTTPException
 
 router = APIRouter()
 
@@ -39,19 +29,13 @@ async def extract_local(
     file: UploadFile = File(...),
     ocr_enabled: bool = Form(True),
     ocr_lang: str = Form("en"),
-    max_pages: Optional[int] = Form(None),
-    # New chunking parameters
-    enable_chunking: bool = Form(False),
-    chunk_min_tokens: int = Form(1000),
-    chunk_max_tokens: int = Form(30000),
-    merge_peers: bool = Form(True),
+    max_pages: Optional[int] = Form(None)
 ):
     """
-    Extract document locally using Docling with OCR support and optional chunking.
+    Extract markdown from a document using Docling with OCR support.
 
     This endpoint processes documents locally without sending data to external services.
-    OCR is automatically applied to scanned content when enabled. Document chunking
-    creates semantically meaningful text chunks suitable for RAG pipelines and LLMs.
+    OCR is automatically applied to scanned content when enabled.
 
     Supported formats: PDF, DOCX, DOC, PPTX, HTML, MD
 
@@ -59,27 +43,14 @@ async def extract_local(
     - macOS: Uses native Vision framework via ocrmac (fast, accurate)
     - Other platforms: Falls back to EasyOCR
 
-    Chunking Support:
-    - Uses tiktoken with cl100k_base encoding (GPT-4 compatible)
-    - Respects document structure (headings, paragraphs, tables)
-    - Includes hierarchical context in each chunk
-
     Args:
         file: Document file to process
         ocr_enabled: Enable OCR for scanned content (default: true)
         ocr_lang: OCR language code (default: "en", use "auto" for detection)
         max_pages: Maximum number of pages to process (optional)
-        enable_chunking: Enable document chunking (default: false)
-        chunk_min_tokens: Minimum tokens per chunk (default: 1000)
-        chunk_max_tokens: Maximum tokens per chunk (default: 30000)
-        merge_peers: Merge sibling elements when possible (default: true)
 
     Returns:
-        JSON response with:
-        - markdown_content: Markdown representation of the document
-        - json_content: Native DoclingDocument JSON format
-        - chunks: Array of document chunks (if chunking enabled)
-        - metadata: Processing information including OCR and chunking details
+        Plain text markdown content
     """
     # Validate file type
     allowed_types = [".pdf", ".docx", ".doc", ".pptx", ".html", ".md"]
@@ -157,104 +128,21 @@ async def extract_local(
         # so we check if OCR was enabled and document has content
         ocr_applied = ocr_enabled and len(result.document.export_to_markdown()) > 0
 
-        # Extract outputs
+        # Extract markdown output
         markdown_content = result.document.export_to_markdown()
-        docling_json = result.document.export_to_dict()
 
         # Calculate processing time
         processing_time = time.time() - start_time
         
-        # Get page count from Docling structure
-        page_count = len(docling_json.get("pages", {}))
-
-        # Build response with unified format
-        response_data = {
-            "markdown_content": markdown_content,
-            "json_content": docling_json,  # Renamed from docling_document
-        }
-
-        # Apply chunking if enabled
-        if enable_chunking:
-            if not CHUNKING_AVAILABLE:
-                return JSONResponse(
-                    status_code=500,
-                    content={
-                        "error": "Chunking dependencies not installed",
-                        "details": "Run: uv add 'docling-core[chunking-openai]'",
-                    },
-                )
-            
-            try:
-                # Initialize tokenizer with GPT-4's encoding
-                tokenizer = OpenAITokenizer(
-                    tokenizer=tiktoken.get_encoding("cl100k_base"),
-                    max_tokens=chunk_max_tokens
-                )
-                
-                # Create chunker with configuration
-                chunker = HybridChunker(
-                    tokenizer=tokenizer,
-                    merge_peers=merge_peers,
-                    min_tokens=chunk_min_tokens
-                )
-                
-                # Process chunks
-                chunks = []
-                for chunk in chunker.chunk(result.document):
-                    # Get contextualized text (includes headings)
-                    contextualized_text = chunker.contextualize(chunk)
-                    
-                    chunks.append({
-                        "text": contextualized_text,
-                        "token_count": tokenizer.count_tokens(contextualized_text),
-                        "meta": chunk.meta.export_json_dict()
-                    })
-                
-                # Add chunks to response
-                response_data["chunks"] = chunks
-                
-            except Exception as e:
-                return JSONResponse(
-                    status_code=500,
-                    content={
-                        "error": "Chunking failed",
-                        "details": str(e),
-                    },
-                )
-
-        # Add metadata
-        response_data["metadata"] = {
-            "page_count": page_count,
-            "processing_type": "docling",
-            "processing_time": processing_time,
-            "file_size": file_size,
-            "filename": file.filename,
-            "ocr_applied": ocr_applied,
-            "ocr_enabled": ocr_enabled,
-            "ocr_platform": "ocrmac" if platform.system() == "Darwin" else "easyocr"
-        }
+        logger.info(f"Extraction completed in {processing_time:.2f} seconds")
         
-        # Add chunking metadata if enabled
-        if enable_chunking and "chunks" in response_data:
-            response_data["metadata"]["chunk_count"] = len(response_data["chunks"])
-            response_data["metadata"]["chunking_enabled"] = True
-            response_data["metadata"]["chunk_config"] = {
-                "min_tokens": chunk_min_tokens,
-                "max_tokens": chunk_max_tokens,
-                "tokenizer": "tiktoken-cl100k_base",
-                "merge_peers": merge_peers
-            }
-
-        return JSONResponse(content=response_data)
+        # Return markdown content directly
+        return markdown_content
 
     except Exception as e:
-        return JSONResponse(
+        raise HTTPException(
             status_code=500,
-            content={
-                "error": "Processing failed",
-                "details": str(e),
-                "file": file.filename,
-            },
+            detail=f"Processing failed: {str(e)}"
         )
     finally:
         # Clean up temporary file

@@ -6,7 +6,6 @@ from routes.extraction_docling import router as extraction_docling_router
 from routes.root import router as root_router
 from routes.segmentation import router as segmentation_router
 from routes.anonymization import router as anonymization_router
-from routes.filtering import router as filtering_router
 from routes.test_ui import router as test_pages_router
 
 app = FastAPI()
@@ -17,5 +16,4 @@ app.include_router(extraction_router)
 app.include_router(extraction_docling_router)
 app.include_router(segmentation_router)
 app.include_router(anonymization_router, prefix="/anonymization")
-app.include_router(filtering_router)
 app.include_router(test_pages_router)

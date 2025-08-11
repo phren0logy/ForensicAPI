@@ -35,9 +35,9 @@ def demo_legal_patterns():
     print("=== Legal Pattern Detection Demo ===\n")
     
     response = requests.post(
-        f"{BASE_URL}/anonymize-markdown",
+        f"{BASE_URL}/anonymize",
         json={
-            "markdown_text": legal_document,
+            "content": legal_document,
             "config": {
                 "pattern_sets": ["legal"],  # Enable legal patterns
                 "entity_types": ["PERSON", "DATE_TIME"],  # Also detect names and dates
@@ -52,7 +52,7 @@ def demo_legal_patterns():
         print(legal_document[:200] + "...\n")
         
         print("Anonymized Document:")
-        print(result['anonymized_text'][:200] + "...\n")
+        print(result['anonymized_content'][:200] + "...\n")
         
         print("Detection Statistics:")
         for entity_type, count in result['statistics'].items():
@@ -95,9 +95,9 @@ def demo_medical_patterns():
     print("\n\n=== Medical Pattern Detection Demo ===\n")
     
     response = requests.post(
-        f"{BASE_URL}/anonymize-markdown",
+        f"{BASE_URL}/anonymize",
         json={
-            "markdown_text": medical_record,
+            "content": medical_record,
             "config": {
                 "pattern_sets": ["medical"],  # Enable medical patterns
                 "entity_types": ["PERSON", "DATE_TIME"],  # Also detect names and dates
@@ -109,7 +109,7 @@ def demo_medical_patterns():
     if response.status_code == 200:
         result = response.json()
         print("Anonymized Medical Record:")
-        print(result['anonymized_text'][:300] + "...\n")
+        print(result['anonymized_content'][:300] + "...\n")
         
         print("Detection Statistics:")
         for entity_type, count in result['statistics'].items():
@@ -163,9 +163,9 @@ def demo_custom_patterns():
     ]
     
     response = requests.post(
-        f"{BASE_URL}/anonymize-markdown",
+        f"{BASE_URL}/anonymize",
         json={
-            "markdown_text": technical_document,
+            "content": technical_document,
             "config": {
                 "custom_patterns": custom_patterns,
                 "entity_types": ["IP_ADDRESS", "CRYPTO", "API_KEY"],  # Combine with AI detection
@@ -180,7 +180,7 @@ def demo_custom_patterns():
         print(technical_document[:200] + "...\n")
         
         print("Anonymized Document:")
-        print(result['anonymized_text'][:300] + "...\n")
+        print(result['anonymized_content'][:300] + "...\n")
         
         print("Detection Statistics:")
         for entity_type, count in result['statistics'].items():
@@ -213,7 +213,7 @@ def demo_combined_patterns():
     print("\n\n=== Combined Patterns Demo ===\n")
     
     response = requests.post(
-        f"{BASE_URL}/anonymize-markdown",
+        f"{BASE_URL}/anonymize",
         json={
             "markdown_text": mixed_document,
             "config": {
@@ -233,7 +233,7 @@ def demo_combined_patterns():
     if response.status_code == 200:
         result = response.json()
         print("Anonymized Mixed Document:")
-        print(result['anonymized_text'])
+        print(result['anonymized_content'])
         
         print("\nDetection Statistics:")
         for entity_type, count in result['statistics'].items():

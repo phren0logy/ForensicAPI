@@ -1,155 +1,24 @@
 import asyncio
-import hashlib
 import logging
 import os
 import tempfile
 import time
 from typing import Any, Dict, List, Optional, Tuple
-import copy
 
 from azure.ai.documentintelligence.aio import (
     DocumentIntelligenceClient as AsyncDocumentIntelligenceClient,
 )
 from azure.ai.documentintelligence.models import AnalyzeResult
 from azure.core.credentials import AzureKeyCredential
-from fastapi import APIRouter, File, Form, UploadFile
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, File, Form, UploadFile, HTTPException
 from pypdf import PdfReader
 from utils import ensure_env_loaded
 
-# Import segmentation functionality
-from .segmentation import create_rich_segments
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-def generate_element_id(element_type: str, page_number: int, index: int, content: str = "") -> str:
-    """
-    Generate a unique, stable ID for an element.
-    
-    Args:
-        element_type: Type of element (paragraph, table, cell, etc.)
-        page_number: Page number where element appears
-        index: Global index of this element type in the document
-        content: Content of the element (first 50 chars used for hash)
-    
-    Returns:
-        Unique ID in format: {type}_{page}_{index}_{hash}
-    """
-    # Create a hash from content for uniqueness
-    content_preview = content[:50] if content else ""
-    hash_input = f"{element_type}_{page_number}_{index}_{content_preview}"
-    content_hash = hashlib.md5(hash_input.encode()).hexdigest()[:6]
-    
-    return f"{element_type}_{page_number}_{index}_{content_hash}"
-
-
-def add_ids_to_elements(analysis_result: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Add unique _id fields to all elements in the Azure DI analysis result.
-    
-    This modifies the analysis result in-place by adding _id fields to:
-    - Paragraphs (document level)
-    - Tables (document level)
-    - Key-value pairs
-    - Cells within tables
-    - Any other element types with content
-    
-    Args:
-        analysis_result: Azure DI analysis result
-        
-    Returns:
-        Modified analysis result with _id fields added
-    """
-    # Create a deep copy to avoid modifying the original
-    result = copy.deepcopy(analysis_result)
-    
-    # Track global indices for each element type
-    indices = {
-        "para": 0,
-        "table": 0,
-        "kv": 0,
-        "list": 0,
-        "fig": 0,
-        "formula": 0,
-    }
-    
-    # Add IDs to paragraphs
-    if "paragraphs" in result:
-        for i, para in enumerate(result["paragraphs"]):
-            page_num = 1  # Default
-            if "boundingRegions" in para and para["boundingRegions"]:
-                page_num = para["boundingRegions"][0].get("pageNumber", 1)
-            
-            content = para.get("content", "")
-            para["_id"] = generate_element_id("para", page_num, indices["para"], content)
-            indices["para"] += 1
-    
-    # Add IDs to tables and their cells
-    if "tables" in result:
-        for i, table in enumerate(result["tables"]):
-            page_num = 1  # Default
-            if "boundingRegions" in table and table["boundingRegions"]:
-                page_num = table["boundingRegions"][0].get("pageNumber", 1)
-            
-            # Generate table ID
-            table_id = generate_element_id("table", page_num, indices["table"], "")
-            table["_id"] = table_id
-            indices["table"] += 1
-            
-            # Add IDs to cells
-            if "cells" in table:
-                for j, cell in enumerate(table["cells"]):
-                    row = cell.get("rowIndex", 0)
-                    col = cell.get("columnIndex", 0)
-                    content = cell.get("content", "")
-                    cell["_id"] = f"cell_{page_num}_{indices['table']-1}_{row}_{col}_{hashlib.md5(content.encode()).hexdigest()[:6]}"
-    
-    # Add IDs to key-value pairs
-    if "keyValuePairs" in result:
-        for i, kv in enumerate(result["keyValuePairs"]):
-            # Try to get page number from key or value
-            page_num = 1
-            key_content = kv.get("key", {}).get("content", "")
-            value_content = kv.get("value", {}).get("content", "")
-            content = f"{key_content}:{value_content}"
-            
-            kv["_id"] = generate_element_id("kv", page_num, indices["kv"], content)
-            indices["kv"] += 1
-    
-    # Add IDs to lists
-    if "lists" in result:
-        for i, lst in enumerate(result["lists"]):
-            page_num = 1
-            if "boundingRegions" in lst and lst["boundingRegions"]:
-                page_num = lst["boundingRegions"][0].get("pageNumber", 1)
-            
-            lst["_id"] = generate_element_id("list", page_num, indices["list"], "")
-            indices["list"] += 1
-    
-    # Add IDs to figures
-    if "figures" in result:
-        for i, fig in enumerate(result["figures"]):
-            page_num = 1
-            if "boundingRegions" in fig and fig["boundingRegions"]:
-                page_num = fig["boundingRegions"][0].get("pageNumber", 1)
-            
-            fig["_id"] = generate_element_id("fig", page_num, indices["fig"], "")
-            indices["fig"] += 1
-    
-    # Add IDs to formulas
-    if "formulas" in result:
-        for i, formula in enumerate(result["formulas"]):
-            page_num = 1
-            if "boundingRegions" in formula and formula["boundingRegions"]:
-                page_num = formula["boundingRegions"][0].get("pageNumber", 1)
-            
-            content = formula.get("value", "")
-            formula["_id"] = generate_element_id("formula", page_num, indices["formula"], content)
-            indices["formula"] += 1
-    
-    return result
 
 
 def get_pdf_page_count(file_path: str) -> int:
@@ -373,50 +242,38 @@ async def analyze_pdf_in_batches(
     return stitched_result, stitched_result.get("content", "")
 
 
-@router.post("/extract", response_class=JSONResponse)
-async def extract(
+@router.post("/extract-azure")
+async def extract_azure(
     file: UploadFile = File(...), 
-    batch_size: int = Form(1500),
-    include_element_ids: bool = Form(True),
-    return_both: bool = Form(False),
-    # New segmentation parameters
-    enable_segmentation: bool = Form(False),
-    segment_min_tokens: int = Form(10000),
-    segment_max_tokens: int = Form(30000)
+    batch_size: int = Form(1500)
 ):
     """
-    Extracts structured data and markdown from a PDF document with optional segmentation.
+    Extracts markdown from a PDF document using Azure Document Intelligence.
 
     This endpoint processes the PDF in batches, then intelligently stitches the
-    results to form a single, cohesive analysis object that is identical to
-    the output of a single API call on the entire document. Optionally segments
-    the result into semantically meaningful chunks for LLM processing.
+    results to form a single markdown document.
     
     Args:
         file: PDF file to process
         batch_size: Number of pages per batch (default: 1500)
-        include_element_ids: Add unique _id fields to all elements (default: True)
-        return_both: Return both original and ID-enriched versions (default: False)
-        enable_segmentation: Enable automatic segmentation of results (default: False)
-        segment_min_tokens: Minimum tokens per segment (default: 10000)
-        segment_max_tokens: Maximum tokens per segment (default: 30000)
+        
+    Returns:
+        Plain text markdown content
     """
     start_time = time.time()
     
     logger.info(
-        f"/extract endpoint called for file: {file.filename}, "
-        f"batch_size: {batch_size}, include_element_ids: {include_element_ids}, "
-        f"return_both: {return_both}, enable_segmentation: {enable_segmentation}, "
-        f"segment_min_tokens: {segment_min_tokens}, segment_max_tokens: {segment_max_tokens}"
+        f"/extract-azure endpoint called for file: {file.filename}, "
+        f"batch_size: {batch_size}"
     )
     ensure_env_loaded()
     endpoint = os.getenv("AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT")
     key = os.getenv("AZURE_DOCUMENT_INTELLIGENCE_KEY")
     if not endpoint or not key:
         logger.warning("Azure DI endpoint/key not set.")
-        return JSONResponse(
+        raise HTTPException(
             status_code=500,
-            content={"error": "Azure Document Intelligence endpoint/key not set"},
+            detail="Azure Document Intelligence endpoint/key not set"
         )
     client = AsyncDocumentIntelligenceClient(
         endpoint=endpoint, credential=AzureKeyCredential(key)
@@ -445,69 +302,13 @@ async def extract(
             # Calculate processing time
             processing_time = time.time() - start_time
             
-            # Prepare the main content
-            if include_element_ids:
-                # Add IDs to elements
-                analysis_result_with_ids = add_ids_to_elements(analysis_result)
-                json_content = analysis_result_with_ids
-            else:
-                # Return original without IDs
-                json_content = analysis_result
+            logger.info(f"Extraction completed in {processing_time:.2f} seconds")
             
-            # Build response with unified format
-            response_content = {
-                "markdown_content": markdown_content,
-                "json_content": json_content,
-                "metadata": {
-                    "page_count": total_pages,
-                    "processing_type": "azure_di",
-                    "processing_time": processing_time,
-                    "file_size": file_size,
-                    "filename": file.filename,
-                    "batch_size": batch_size,
-                    "element_ids_included": include_element_ids
-                }
-            }
-            
-            # Apply segmentation if enabled
-            if enable_segmentation:
-                try:
-                    # Create segments using the existing segmentation logic
-                    segments = create_rich_segments(
-                        json_content,
-                        file.filename,
-                        segment_min_tokens,
-                        segment_max_tokens
-                    )
-                    
-                    # Add segments to response
-                    response_content["segments"] = [segment.model_dump() for segment in segments]
-                    
-                    # Update metadata with segmentation info
-                    response_content["metadata"]["segmentation_enabled"] = True
-                    response_content["metadata"]["segment_count"] = len(segments)
-                    response_content["metadata"]["segment_config"] = {
-                        "min_tokens": segment_min_tokens,
-                        "max_tokens": segment_max_tokens
-                    }
-                except Exception as e:
-                    logger.error(f"Segmentation failed: {e}", exc_info=True)
-                    # Continue without segmentation rather than failing the entire request
-                    response_content["metadata"]["segmentation_enabled"] = False
-                    response_content["metadata"]["segmentation_error"] = str(e)
-            else:
-                response_content["metadata"]["segmentation_enabled"] = False
-            
-            # Handle legacy return_both parameter if needed
-            if return_both and include_element_ids:
-                response_content["json_content_original"] = analysis_result
-            
-            return JSONResponse(content=response_content)
+            # Return markdown content directly
+            return markdown_content
             
     except Exception as e:
         logger.error(f"Error during PDF extraction: {e}", exc_info=True)
-        return JSONResponse(
-            status_code=500, content={"error": f"An unexpected error occurred: {e}"}
-        )
+        raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {e}")
     finally:
         os.remove(temp_path) 

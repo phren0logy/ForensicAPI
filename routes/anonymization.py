@@ -57,58 +57,21 @@ class AnonymizationConfig(BaseModel):
 
 
 class AnonymizationRequest(BaseModel):
-    """Request body for anonymization endpoint."""
-    azure_di_json: Dict[str, Any] = Field(..., description="Raw Azure DI extraction output")
+    """Request body for unified anonymization endpoint."""
+    content: str = Field(..., description="Markdown text to anonymize")
     config: AnonymizationConfig = Field(default_factory=AnonymizationConfig)
-    vault_data: Optional[List[List[str]]] = Field(None, description="Previous vault data for consistent anonymization across requests")
+    vault_data: Optional[Dict[str, Any]] = Field(None, description="Previous vault data for consistent anonymization across requests")
 
 
 class AnonymizationResponse(BaseModel):
     """Response from anonymization endpoint."""
-    anonymized_json: Dict[str, Any] = Field(..., description="Anonymized Azure DI JSON")
+    anonymized_content: str = Field(..., description="Anonymized markdown text")
     statistics: Dict[str, int] = Field(..., description="Count of anonymized entities by type")
-    vault_data: List[List[str]] = Field(..., description="Vault data containing anonymization mappings for stateless operation")
+    vault_data: Dict[str, Any] = Field(..., description="Vault data containing anonymization mappings for stateless operation")
 
 
-class MarkdownAnonymizationRequest(BaseModel):
-    """Request body for markdown anonymization endpoint."""
-    markdown_text: str = Field(..., description="Markdown text to anonymize")
-    config: AnonymizationConfig = Field(default_factory=AnonymizationConfig)
-    vault_data: Optional[List[List[str]]] = Field(None, description="Previous vault data for consistent anonymization across requests")
 
 
-class MarkdownAnonymizationResponse(BaseModel):
-    """Response from markdown anonymization endpoint."""
-    anonymized_text: str = Field(..., description="Anonymized markdown text")
-    statistics: Dict[str, int] = Field(..., description="Count of anonymized entities by type")
-    decision_process: Optional[List[Dict]] = Field(None, description="Detection reasoning if requested")
-    vault_data: List[List[str]] = Field(..., description="Vault data containing anonymization mappings for stateless operation")
-
-
-class PseudonymizationRequest(BaseModel):
-    """Request body for pseudonymization endpoint."""
-    text: str = Field(..., description="Text to pseudonymize")
-    vault_data: Optional[List[List[str]]] = Field(None, description="Previous vault data for consistent pseudonymization across documents")
-    config: AnonymizationConfig = Field(default_factory=AnonymizationConfig)
-
-
-class PseudonymizationResponse(BaseModel):
-    """Response from pseudonymization endpoint."""
-    pseudonymized_text: str = Field(..., description="Pseudonymized text")
-    statistics: Dict[str, int] = Field(..., description="Count of pseudonymized entities by type")
-    vault_data: List[List[str]] = Field(..., description="Updated vault data with all mappings")
-
-
-class DeanonymizationRequest(BaseModel):
-    """Request body for deanonymization endpoint."""
-    text: str = Field(..., description="Text to deanonymize")
-    vault_data: List[List[str]] = Field(..., description="Vault data containing anonymization mappings")
-
-
-class DeanonymizationResponse(BaseModel):
-    """Response from deanonymization endpoint."""
-    deanonymized_text: str = Field(..., description="Deanonymized text with original values restored")
-    statistics: Dict[str, int] = Field(..., description="Count of deanonymized entities by type")
 
 
 # Global scanner (initialized on first use)
@@ -116,62 +79,78 @@ class DeanonymizationResponse(BaseModel):
 global_scanner: Optional[Anonymize] = None
 
 
-def serialize_vault(vault: Vault, date_offset: Optional[int] = None) -> List[List[str]]:
-    """Serialize vault to list of [placeholder, original] pairs with optional metadata."""
-    data = []
-    
-    # Add date offset as metadata if provided
-    if date_offset is not None:
-        data.append(["_date_offset", str(date_offset)])
-    
-    # Add all vault entries
-    for placeholder, original in vault.get():
-        data.append([placeholder, original])
-    
-    return data
+def serialize_vault_v2(vault_mappings: Dict[str, str], date_offset: int, total_files: int = 1) -> Dict[str, Any]:
+    """Serialize vault to v2.0 format."""
+    from datetime import datetime
+    return {
+        "version": "2.0",
+        "created": datetime.now().isoformat(),
+        "metadata": {
+            "date_offset": date_offset,
+            "total_files": total_files
+        },
+        "mappings": [[replacement, original] for original, replacement in vault_mappings.items()]
+    }
 
 
-def deserialize_vault(vault_data: Optional[List[List[str]]]) -> tuple[Vault, Optional[int]]:
-    """Deserialize vault data and extract metadata.
+def deserialize_vault_v2(vault_data: Optional[Dict[str, Any]]) -> tuple[Vault, Optional[int], Dict[str, str]]:
+    """Deserialize v2.0 vault data.
     
     Returns:
-        tuple: (vault, date_offset)
+        tuple: (vault, date_offset, mappings_dict)
     """
     vault = Vault()
     date_offset = None
+    mappings = {}
     
     if not vault_data:
-        return vault, date_offset
+        return vault, date_offset, mappings
     
-    for entry in vault_data:
-        if len(entry) != 2:
-            continue
-            
-        placeholder, original = entry
+    # Handle v2.0 format
+    if isinstance(vault_data, dict) and vault_data.get("version") == "2.0":
+        # Extract metadata
+        metadata = vault_data.get("metadata", {})
+        date_offset = metadata.get("date_offset")
         
-        # Handle metadata entries
-        if placeholder == "_date_offset":
-            try:
-                date_offset = int(original)
-            except ValueError:
-                logger.warning(f"Invalid date offset value: {original}")
-        else:
-            # Regular vault entry
-            vault.append((placeholder, original))
+        # Extract mappings
+        for mapping in vault_data.get("mappings", []):
+            if len(mapping) == 2:
+                replacement, original = mapping
+                mappings[original] = replacement
+                # For LLM-Guard compatibility, we need placeholders in vault
+                # We'll reconstruct them when scanning
+    else:
+        # Handle legacy format (list of lists)
+        if isinstance(vault_data, list):
+            for entry in vault_data:
+                if len(entry) != 2:
+                    continue
+                    
+                placeholder, original = entry
+                
+                # Handle metadata entries
+                if placeholder == "_date_offset":
+                    try:
+                        date_offset = int(original)
+                    except ValueError:
+                        logger.warning(f"Invalid date offset value: {original}")
+                else:
+                    # Regular vault entry
+                    vault.append((placeholder, original))
     
-    return vault, date_offset
+    return vault, date_offset, mappings
 
 
 
-def create_anonymizer(config: AnonymizationConfig, vault_data: Optional[List[List[str]]] = None) -> tuple[Anonymize, Vault, Optional[int]]:
+def create_anonymizer(config: AnonymizationConfig, vault_data: Optional[Dict[str, Any]] = None) -> tuple[Anonymize, Vault, Optional[int], Dict[str, str]]:
     """Create LLM-Guard anonymizer with AI4Privacy model.
     
-    Returns a new scanner, vault, and date_offset for session isolation.
+    Returns a new scanner, vault, date_offset, and mappings for session isolation.
     If vault_data is provided, initializes vault with previous anonymization mappings
     and extracts any metadata like date_offset.
     """
     # Deserialize vault data if provided
-    vault, date_offset = deserialize_vault(vault_data)
+    vault, date_offset, mappings = deserialize_vault_v2(vault_data)
     
     try:
         # Default entity types used by LLM-Guard when entity_types is None
@@ -209,7 +188,7 @@ def create_anonymizer(config: AnonymizationConfig, vault_data: Optional[List[Lis
             vault=vault,
             recognizer_conf=DISTILBERT_AI4PRIVACY_v2_CONF,
             threshold=config.score_threshold,
-            use_faker=True,  # Enable Faker for all entities (Note: limits consistency with vault)
+            use_faker=False,  # Disable faker to get placeholder tokens for consistent replacement
             entity_types=all_entity_types,
             regex_patterns=regex_patterns,  # Add custom regex patterns
             language="en"
@@ -224,91 +203,127 @@ def create_anonymizer(config: AnonymizationConfig, vault_data: Optional[List[Lis
             logger.info(f"✅ Using entity types: {all_entity_types}")
         else:
             logger.info("✅ Using all default entity types + custom patterns")
-        return scanner, vault, date_offset
+        return scanner, vault, date_offset, mappings
         
     except Exception as e:
         logger.error(f"Failed to create LLM-Guard scanner: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to create LLM-Guard scanner: {str(e)}")
 
 
-def get_consistent_replacement(entity_type: str, original_value: str, 
-                             date_shift_days: int = 365,
-                             replacement_mappings: Dict[str, Dict[str, str]] = None) -> str:
-    """Get consistent replacement for a value based on entity type."""
-    if replacement_mappings is None:
-        replacement_mappings = {}
+def apply_consistent_faker_replacements(text: str, vault: Vault, config: AnonymizationConfig, existing_mappings: Dict[str, str], date_offset: Optional[int] = None) -> tuple[str, Dict[str, int], Dict[str, Any]]:
+    """
+    Post-process LLM-Guard output to replace placeholders with consistent faker values.
     
-    # Check if we already have a replacement for this value
-    if entity_type not in replacement_mappings:
-        replacement_mappings[entity_type] = {}
-    
-    if original_value in replacement_mappings[entity_type]:
-        return replacement_mappings[entity_type][original_value]
-    
-    # Generate new replacement based on entity type
-    if entity_type == "PERSON":
-        replacement = fake.name()
-    elif entity_type == "DATE_TIME":
-        # Get or create consistent shift for this session
-        if "_date_shift_days" not in replacement_mappings:
-            # Add some noise to the shift range for better security
-            noise_factor = random.uniform(0.8, 1.2)
-            adjusted_days = int(date_shift_days * noise_factor)
-            replacement_mappings["_date_shift_days"] = random.randint(-adjusted_days, adjusted_days)
+    Args:
+        text: Text with [REDACTED_ENTITY_TYPE_N] placeholders from LLM-Guard
+        vault: Vault containing existing mappings
+        config: Anonymization configuration
+        date_offset: Existing date offset for consistency
         
-        shift_days = replacement_mappings["_date_shift_days"]
+    Returns:
+        tuple: (processed_text, statistics, vault_mappings_dict)
+    """
+    import re
+    
+    # Create mappings dict for v2.0 vault structure
+    vault_mappings = {}
+    statistics = {}
+    result_text = text
+    
+    # Use provided existing mappings
+    current_mappings = existing_mappings.copy()
+    
+    # Find all placeholders in the text
+    placeholder_pattern = r'\[REDACTED_([A-Z_]+)_(\d+)\]'
+    placeholders = re.findall(placeholder_pattern, text)
+    
+    # Get unique placeholders to process
+    unique_placeholders = list(set(placeholders))
+    
+    # Process each unique placeholder
+    for entity_type, index in unique_placeholders:
+        placeholder = f"[REDACTED_{entity_type}_{index}]"
+        
+        # Get the original value from vault
+        original_value = None
+        for vault_placeholder, vault_original in vault.get():
+            if vault_placeholder == placeholder:
+                original_value = vault_original
+                break
+        
+        if not original_value:
+            # This shouldn't happen with LLM-Guard, but handle gracefully
+            logger.warning(f"No original value found for placeholder: {placeholder}")
+            continue
+        
+        # Check if we already have a replacement for this value
+        if original_value in current_mappings:
+            replacement = current_mappings[original_value]
+        else:
+            # Generate new replacement based on entity type
+            replacement = generate_faker_replacement(entity_type, original_value, config, date_offset)
+            current_mappings[original_value] = replacement
+        
+        # Replace all occurrences of this placeholder
+        result_text = result_text.replace(placeholder, replacement)
+        
+        # Update statistics
+        count = text.count(placeholder)
+        statistics[entity_type] = statistics.get(entity_type, 0) + count
+        
+        # Add to vault mappings for v2.0 structure
+        vault_mappings[original_value] = replacement
+    
+    return result_text, statistics, vault_mappings
+
+
+def generate_faker_replacement(entity_type: str, original_value: str, config: AnonymizationConfig, date_offset: Optional[int] = None) -> str:
+    """Generate a faker replacement for a given entity type and value."""
+    if entity_type == "PERSON":
+        return fake.name()
+    elif entity_type == "DATE_TIME" or entity_type == "DATE":
+        # Apply consistent date shifting
+        if date_offset is None:
+            date_offset = random.randint(-config.date_shift_days, config.date_shift_days)
         
         try:
-            # Parse the original date
             parsed_date = date_parser.parse(original_value, fuzzy=True)
-            
-            # Apply the shift
-            shifted_date = parsed_date + timedelta(days=shift_days)
+            shifted_date = parsed_date + timedelta(days=date_offset)
             
             # Format based on original format hints
             if ":" in original_value and len(original_value) > 10:
-                # Likely includes time
-                replacement = shifted_date.strftime("%B %d, %Y at %I:%M %p")
+                return shifted_date.strftime("%B %d, %Y at %I:%M %p")
             elif "/" in original_value:
-                # US format
-                replacement = shifted_date.strftime("%m/%d/%Y")
+                return shifted_date.strftime("%m/%d/%Y")
             elif "-" in original_value and len(original_value) == 10:
-                # ISO format
-                replacement = shifted_date.strftime("%Y-%m-%d")
+                return shifted_date.strftime("%Y-%m-%d")
             else:
-                # Default readable format
-                replacement = shifted_date.strftime("%B %d, %Y")
-        except Exception as e:
-            # Fallback to a random date this year
-            logger.warning(f"Could not parse date '{original_value}': {e}")
-            replacement = fake.date_this_year().strftime("%B %d, %Y")
+                return shifted_date.strftime("%B %d, %Y")
+        except Exception:
+            return fake.date_this_year().strftime("%B %d, %Y")
     elif entity_type == "LOCATION":
-        replacement = fake.city()
+        return fake.city()
     elif entity_type == "PHONE_NUMBER":
-        replacement = fake.phone_number()
-    elif entity_type == "EMAIL_ADDRESS":
-        replacement = fake.email()
-    elif entity_type == "US_SSN":
-        # Use cryptographically secure random for sensitive IDs
-        area = secrets.randbelow(899) + 100  # 100-999, avoiding 666
-        group = secrets.randbelow(99) + 1     # 01-99
-        serial = secrets.randbelow(9999) + 1  # 0001-9999
-        replacement = f"{area:03d}-{group:02d}-{serial:04d}"
+        return fake.phone_number()
+    elif entity_type == "EMAIL_ADDRESS" or entity_type == "EMAIL":
+        return fake.email()
+    elif entity_type == "US_SSN" or entity_type == "SSN":
+        area = secrets.randbelow(899) + 100
+        group = secrets.randbelow(99) + 1
+        serial = secrets.randbelow(9999) + 1
+        return f"{area:03d}-{group:02d}-{serial:04d}"
     elif entity_type == "MEDICAL_LICENSE":
-        # Use cryptographically secure random for medical licenses
-        replacement = f"MD{secrets.randbelow(999999):06d}"
+        return f"MD{secrets.randbelow(999999):06d}"
     else:
-        # Check if this is a custom pattern type
+        # Check for custom pattern replacement
         custom_replacement = get_replacement_for_pattern(entity_type, original_value)
         if custom_replacement != f"[REDACTED_{entity_type}]":
-            replacement = custom_replacement
+            return custom_replacement
         else:
-            # Default for unknown types
-            replacement = f"[REDACTED_{entity_type}]"
-    
-    # Store for consistency
-    replacement_mappings[entity_type][original_value] = replacement
-    return replacement
+            # Default: use a generic faker method
+            return f"ANON_{entity_type}_{secrets.token_hex(4).upper()}"
+
+
 
 
 def generate_session_shift(date_shift_days: int, existing_offset: Optional[int] = None) -> int:
@@ -329,146 +344,9 @@ def generate_session_shift(date_shift_days: int, existing_offset: Optional[int] 
     return random.randint(-date_shift_days, date_shift_days)
 
 
-def extract_date_entities_from_vault(vault: Vault) -> List[tuple[str, str]]:
-    """Extract date entities from LLM-Guard vault.
-    
-    Returns list of (replacement, original) tuples for DATE_TIME entities.
-    """
-    date_entities = []
-    
-    # Get all tuples from vault
-    for replacement, original in vault.get():
-        # Check if this looks like a date based on the replacement format
-        # LLM-Guard typically replaces dates with YYYY-MM-DD format
-        if len(replacement) == 10 and replacement.count('-') == 2:
-            try:
-                # Verify it's a valid date
-                date_parser.parse(replacement)
-                date_entities.append((replacement, original))
-            except (ValueError, TypeError):
-                pass
-    
-    return date_entities
-
-
-def apply_date_shifts(text: str, date_entities: List[tuple[str, str]], date_shift: int) -> str:
-    """Apply date shifting to preserve temporal relationships."""
-    result = text
-    
-    for faker_date, original_date in date_entities:
-        try:
-            # Parse the original date
-            parsed_date = date_parser.parse(original_date, fuzzy=True)
-            
-            # Apply the shift
-            shifted_date = parsed_date + timedelta(days=date_shift)
-            
-            # Format based on original format hints
-            if ":" in original_date and len(original_date) > 10:
-                # Likely includes time
-                new_date = shifted_date.strftime("%B %d, %Y at %I:%M %p")
-            elif "/" in original_date:
-                # US format
-                new_date = shifted_date.strftime("%m/%d/%Y")
-            elif "-" in original_date and len(original_date) == 10:
-                # ISO format
-                new_date = shifted_date.strftime("%Y-%m-%d")
-            else:
-                # Default readable format
-                new_date = shifted_date.strftime("%B %d, %Y")
-            
-            # Replace the faker date with our shifted date
-            result = result.replace(faker_date, new_date)
-            
-        except Exception as e:
-            logger.warning(f"Could not shift date '{original_date}': {e}")
-    
-    return result
-
-
-def update_vault_with_shifted_dates(vault: Vault, date_entities: List[tuple[str, str]], date_shift: int):
-    """Update vault with shifted dates for consistency."""
-    # Remove old entries and add updated ones
-    for faker_date, original_date in date_entities:
-        try:
-            # Parse and shift the original date
-            parsed_date = date_parser.parse(original_date, fuzzy=True)
-            shifted_date = parsed_date + timedelta(days=date_shift)
-            
-            # Format the shifted date (using ISO format for consistency)
-            shifted_str = shifted_date.strftime("%Y-%m-%d")
-            
-            # Remove the old tuple
-            vault.remove((faker_date, original_date))
-            
-            # Add the new tuple with shifted date as the replacement
-            vault.append((shifted_str, original_date))
-            
-        except Exception as e:
-            logger.warning(f"Could not update vault for date '{original_date}': {e}")
 
 
 
-def deanonymize_text_with_vault(text: str, vault_data: List[List[str]]) -> tuple[str, Dict[str, int]]:
-    """Deanonymize text using vault mappings.
-    
-    Args:
-        text: Text containing pseudonymized values
-        vault_data: Vault data with [placeholder, original] mappings
-        
-    Returns:
-        tuple: (deanonymized_text, statistics)
-    """
-    result = text
-    statistics = {}
-    
-    # Sort by placeholder length (descending) to avoid partial replacements
-    sorted_mappings = sorted(vault_data, key=lambda x: len(x[0]) if len(x) == 2 else 0, reverse=True)
-    
-    for mapping in sorted_mappings:
-        if len(mapping) != 2:
-            continue
-            
-        placeholder, original = mapping
-        
-        # Skip metadata entries
-        if placeholder.startswith("_"):
-            continue
-            
-        # Count occurrences before replacement
-        count = result.count(placeholder)
-        if count > 0:
-            # Replace all occurrences
-            result = result.replace(placeholder, original)
-            
-            # Infer entity type for statistics
-            # Check if it's a custom entity type with pattern [REDACTED_ENTITY_TYPE_N]
-            if placeholder.startswith('[REDACTED_') and placeholder.endswith(']'):
-                # Extract entity type from pattern like [REDACTED_BATES_NUMBER_1]
-                parts = placeholder[10:-1].rsplit('_', 1)  # Remove [REDACTED_ and ], split from right
-                if len(parts) == 2 and parts[1].isdigit():
-                    entity_type = parts[0]
-                else:
-                    entity_type = 'OTHER'
-            elif '@' in placeholder:
-                entity_type = 'EMAIL_ADDRESS'
-            elif len(placeholder) == 11 and placeholder[3] == '-' and placeholder[6] == '-':
-                entity_type = 'US_SSN'
-            elif len(placeholder) == 10 and placeholder.count('-') == 2:
-                entity_type = 'DATE_TIME'
-            elif placeholder.replace('-', '').replace(' ', '').replace('(', '').replace(')', '').isdigit() and len(placeholder) >= 10:
-                entity_type = 'PHONE_NUMBER'
-            else:
-                # Check if it looks like a name
-                words = placeholder.split()
-                if len(words) >= 2 and all(w[0].isupper() for w in words if w):
-                    entity_type = 'PERSON'
-                else:
-                    entity_type = 'OTHER'
-            
-            statistics[entity_type] = statistics.get(entity_type, 0) + count
-    
-    return result, statistics
 
 
 def extract_statistics_from_vault(vault: Vault) -> Dict[str, int]:
@@ -510,151 +388,77 @@ def extract_statistics_from_vault(vault: Vault) -> Dict[str, int]:
     return stats
 
 
-def anonymize_text_with_date_shift(text: str, scanner: Anonymize,
-                                  vault: Vault,
-                                  config: AnonymizationConfig,
-                                  date_shift: Optional[int] = None) -> tuple[str, Dict[str, int], Optional[List[Dict]]]:
-    """Anonymize text using LLM-Guard with custom date shifting."""
+def anonymize_text_with_consistent_replacements(text: str, scanner: Anonymize,
+                                               vault: Vault,
+                                               config: AnonymizationConfig,
+                                               existing_mappings: Dict[str, str],
+                                               date_offset: Optional[int] = None) -> tuple[str, Dict[str, int], Dict[str, Any]]:
+    """Anonymize text using LLM-Guard with consistent faker replacements."""
     if not text or not isinstance(text, str):
-        return text, {}, None
+        return text, {}, {}
     
-    # Step 1: LLM-Guard anonymization
+    # Step 1: LLM-Guard anonymization (with use_faker=False to get placeholders)
     sanitized_text, is_valid, risk_score = scanner.scan(text)
     
-    # Step 2: Apply custom date shifting if enabled
-    if config.date_shift_days and date_shift is not None:
-        # Extract date entities from vault
-        date_entities = extract_date_entities_from_vault(vault)
-        
-        if date_entities:
-            # Replace LLM-Guard's random dates with shifted dates
-            sanitized_text = apply_date_shifts(
-                sanitized_text, 
-                date_entities, 
-                date_shift
-            )
-            
-            # Update vault for consistency
-            update_vault_with_shifted_dates(
-                vault, 
-                date_entities, 
-                date_shift
-            )
+    # Step 2: Apply consistent faker replacements
+    processed_text, statistics, vault_mappings = apply_consistent_faker_replacements(
+        sanitized_text, vault, config, existing_mappings, date_offset
+    )
     
-    # Step 3: Extract statistics from vault
-    statistics = extract_statistics_from_vault(vault)
-    
-    # Decision process not yet supported with LLM-Guard
-    decision_process = None
-    
-    return sanitized_text, statistics, decision_process
+    return processed_text, statistics, vault_mappings
 
 
-def anonymize_azure_di_json(data: Dict[str, Any], 
-                           config: AnonymizationConfig,
-                           scanner: Anonymize,
-                           vault: Vault,
-                           date_shift: Optional[int] = None) -> tuple[Dict[str, Any], Dict[str, int]]:
-    """Recursively anonymize Azure DI JSON while preserving structure."""
-    if not isinstance(data, dict):
-        return data, {}
-    
-    anonymized = {}
-    total_stats = {}
-    
-    # Fields that commonly contain PII in Azure DI output
-    text_fields = {
-        "content", "text", "value", "name", "description",
-        "title", "subject", "author", "creator", "producer"
-    }
-    
-    for key, value in data.items():
-        if isinstance(value, str) and (key in text_fields or config.anonymize_all_strings):
-            # Anonymize text field
-            anonymized_text, stats, _ = anonymize_text_with_date_shift(
-                value, scanner, vault, config, date_shift
-            )
-            anonymized[key] = anonymized_text
-            
-            # Merge statistics
-            for entity_type, count in stats.items():
-                total_stats[entity_type] = total_stats.get(entity_type, 0) + count
-                
-        elif isinstance(value, list):
-            # Recursively process lists
-            anonymized_list = []
-            for item in value:
-                if isinstance(item, dict):
-                    anon_item, item_stats = anonymize_azure_di_json(
-                        item, config, scanner, vault, date_shift
-                    )
-                    anonymized_list.append(anon_item)
-                    # Merge statistics
-                    for entity_type, count in item_stats.items():
-                        total_stats[entity_type] = total_stats.get(entity_type, 0) + count
-                elif isinstance(item, str):
-                    # Check if it might contain PII
-                    anon_text, stats, _ = anonymize_text_with_date_shift(
-                        item, scanner, vault, config, date_shift
-                    )
-                    anonymized_list.append(anon_text)
-                    for entity_type, count in stats.items():
-                        total_stats[entity_type] = total_stats.get(entity_type, 0) + count
-                else:
-                    anonymized_list.append(item)
-            anonymized[key] = anonymized_list
-            
-        elif isinstance(value, dict):
-            # Recursively process nested objects
-            anon_dict, dict_stats = anonymize_azure_di_json(
-                value, config, scanner, vault, date_shift
-            )
-            anonymized[key] = anon_dict
-            # Merge statistics
-            for entity_type, count in dict_stats.items():
-                total_stats[entity_type] = total_stats.get(entity_type, 0) + count
-        else:
-            # Keep other types as-is (numbers, booleans, null)
-            anonymized[key] = value
-    
-    return anonymized, total_stats
 
 
-@router.post("/anonymize-azure-di", response_model=AnonymizationResponse)
-async def anonymize_azure_di_endpoint(request: AnonymizationRequest):
+
+
+@router.post("/anonymize", response_model=AnonymizationResponse)
+async def anonymize_endpoint(request: AnonymizationRequest):
     """
-    Anonymize Azure DI JSON output for safe storage and testing.
+    Anonymize markdown text with consistent, reversible PII replacement.
     
     This endpoint:
     1. Detects PII using LLM-Guard with AI4Privacy BERT model (54 PII types)
-    2. Replaces PII with realistic fake data using cryptographically secure random values
-    3. Preserves Azure DI JSON structure and element IDs
-    4. Provides consistent replacements within a session
-    5. Implements session isolation for security
-    6. Supports stateless operation by accepting/returning vault data
+    2. Replaces PII with consistent fake data (same person = same fake name)
+    3. Always creates a reversible vault for restoration
+    4. Preserves markdown formatting (headers, lists, code blocks, etc.)
+    5. Supports stateless operation by accepting/returning vault data
     """
     try:
         # Create scanner with optional vault data for stateless operation
-        scanner, vault, existing_date_offset = create_anonymizer(request.config, request.vault_data)
+        scanner, vault, existing_date_offset, existing_mappings = create_anonymizer(request.config, request.vault_data)
         
         # Generate or use existing date shift if enabled
         date_shift = None
         if request.config.date_shift_days:
             date_shift = generate_session_shift(request.config.date_shift_days, existing_date_offset)
         
-        # Anonymize the JSON
-        anonymized_json, statistics = anonymize_azure_di_json(
-            request.azure_di_json,
-            request.config,
+        # Anonymize the text with consistent replacements
+        anonymized_text, statistics, vault_mappings = anonymize_text_with_consistent_replacements(
+            request.content,
             scanner,
             vault,
+            request.config,
+            existing_mappings,
             date_shift
         )
         
+        # Create v2.0 vault structure
+        from datetime import datetime
+        vault_v2 = {
+            "version": "2.0",
+            "created": datetime.now().isoformat(),
+            "metadata": {
+                "date_offset": date_shift if date_shift is not None else 0,
+                "total_files": 1
+            },
+            "mappings": [[replacement, original] for original, replacement in vault_mappings.items()]
+        }
+        
         return AnonymizationResponse(
-            anonymized_json=anonymized_json,
+            anonymized_content=anonymized_text,
             statistics=statistics,
-            vault_data=serialize_vault(vault, date_shift)
+            vault_data=vault_v2
         )
         
     except Exception as e:
@@ -662,120 +466,6 @@ async def anonymize_azure_di_endpoint(request: AnonymizationRequest):
         raise HTTPException(status_code=500, detail=f"Anonymization failed: {str(e)}")
 
 
-@router.post("/anonymize-markdown", response_model=MarkdownAnonymizationResponse)
-async def anonymize_markdown_endpoint(request: MarkdownAnonymizationRequest):
-    """
-    Anonymize markdown text while preserving formatting.
-    
-    This endpoint:
-    1. Detects PII in markdown text using LLM-Guard with AI4Privacy BERT model
-    2. Replaces PII with realistic fake data using secure random generation
-    3. Preserves markdown formatting (headers, lists, code blocks, etc.)
-    4. Provides consistent replacements within a session
-    5. Implements session isolation for security
-    6. Supports stateless operation by accepting/returning vault data
-    """
-    try:
-        # Create scanner with optional vault data for stateless operation
-        scanner, vault, existing_date_offset = create_anonymizer(request.config, request.vault_data)
-        
-        # Generate or use existing date shift if enabled
-        date_shift = None
-        if request.config.date_shift_days:
-            date_shift = generate_session_shift(request.config.date_shift_days, existing_date_offset)
-        
-        # Anonymize the markdown text
-        anonymized_text, statistics, decision_process = anonymize_text_with_date_shift(
-            request.markdown_text,
-            scanner,
-            vault,
-            request.config,
-            date_shift
-        )
-        
-        return MarkdownAnonymizationResponse(
-            anonymized_text=anonymized_text,
-            statistics=statistics,
-            decision_process=decision_process,
-            vault_data=serialize_vault(vault, date_shift)
-        )
-        
-    except Exception as e:
-        logger.error(f"Markdown anonymization failed: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Markdown anonymization failed: {str(e)}")
-
-
-@router.post("/pseudonymize", response_model=PseudonymizationResponse)
-async def pseudonymize_endpoint(request: PseudonymizationRequest):
-    """
-    Pseudonymize text with consistent replacements across documents.
-    
-    This endpoint:
-    1. Detects PII using LLM-Guard with AI4Privacy BERT model
-    2. Replaces PII with consistent pseudonyms
-    3. Maintains vault data for reversibility and consistency
-    4. Supports stateless operation by accepting/returning vault data
-    
-    The difference from anonymization is that this is designed for reversibility
-    and maintaining consistent replacements across multiple documents.
-    """
-    try:
-        # Create scanner with optional vault data for stateless operation
-        scanner, vault, existing_date_offset = create_anonymizer(request.config, request.vault_data)
-        
-        # Generate or use existing date shift if enabled
-        date_shift = None
-        if request.config.date_shift_days:
-            date_shift = generate_session_shift(request.config.date_shift_days, existing_date_offset)
-        
-        # Pseudonymize the text
-        pseudonymized_text, statistics, _ = anonymize_text_with_date_shift(
-            request.text,
-            scanner,
-            vault,
-            request.config,
-            date_shift
-        )
-        
-        return PseudonymizationResponse(
-            pseudonymized_text=pseudonymized_text,
-            statistics=statistics,
-            vault_data=serialize_vault(vault, date_shift)
-        )
-        
-    except Exception as e:
-        logger.error(f"Pseudonymization failed: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Pseudonymization failed: {str(e)}")
-
-
-@router.post("/deanonymize", response_model=DeanonymizationResponse)
-async def deanonymize_endpoint(request: DeanonymizationRequest):
-    """
-    Deanonymize text using vault mappings.
-    
-    This endpoint:
-    1. Reverses pseudonymization using vault data
-    2. Restores original values from pseudonyms
-    3. Provides statistics on deanonymized entities
-    
-    Note: This only works with text that was pseudonymized using the
-    /pseudonymize endpoint with the same vault data.
-    """
-    try:
-        # Deanonymize using vault mappings
-        deanonymized_text, statistics = deanonymize_text_with_vault(
-            request.text,
-            request.vault_data
-        )
-        
-        return DeanonymizationResponse(
-            deanonymized_text=deanonymized_text,
-            statistics=statistics
-        )
-        
-    except Exception as e:
-        logger.error(f"Deanonymization failed: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Deanonymization failed: {str(e)}")
 
 
 @router.get("/health")

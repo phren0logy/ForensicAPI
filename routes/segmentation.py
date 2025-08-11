@@ -5,11 +5,6 @@ import tiktoken
 from fastapi import APIRouter, Body, HTTPException
 from pydantic import BaseModel, Field
 
-# Import filtering functionality
-from .filtering import (
-    FilterConfig, FilteredElement, ElementMapping, FilterMetrics,
-    apply_filters
-)
 
 # --- Configuration ---
 # Remove hard-coded constants, will be configurable via API
@@ -39,24 +34,6 @@ class SegmentationInput(BaseModel):
     min_segment_tokens: int = 10000  # Configurable with reasonable default
     max_segment_tokens: int = 30000  # Configurable with reasonable default
 
-class FilteredSegmentationInput(BaseModel):
-    source_file: str
-    json_content: Dict[str, Any]  # Changed from analysis_result
-    filter_config: FilterConfig
-    min_segment_tokens: int = 10000  # Configurable with reasonable default
-    max_segment_tokens: int = 30000  # Configurable with reasonable default
-
-class FilteredSegment(BaseModel):
-    segment_id: int
-    source_file: str
-    token_count: int
-    structural_context: StructuralContext
-    elements: List[Union[FilteredElement, Dict[str, Any]]] = Field(default_factory=list)
-
-class FilteredSegmentationResponse(BaseModel):
-    segments: List[FilteredSegment]
-    element_mappings: List[List[ElementMapping]]  # Mappings per segment
-    metrics: FilterMetrics
 
 # --- Core Segmentation Logic ---
 
@@ -243,87 +220,6 @@ def create_rich_segments(
     logger.info(f"Created {len(segments)} segments from {len(all_elements)} elements")
     return segments
 
-def create_filtered_segments(
-    filtered_elements: List[Union[FilteredElement, Dict[str, Any]]],
-    source_file: str,
-    min_segment_tokens: int = 10000,
-    max_segment_tokens: int = 30000
-) -> List[FilteredSegment]:
-    """
-    Create segments from pre-filtered elements.
-    
-    This is similar to create_rich_segments but works with FilteredElement objects
-    that have already been processed to remove unnecessary fields.
-    """
-    segments = []
-    buffer_elements = []
-    buffer_token_count = 0
-    segment_id_counter = 0
-    current_context = StructuralContext()
-
-    for element in filtered_elements:
-        # Get fields from element (handle both dict and object)
-        if isinstance(element, dict):
-            role = element.get("role")
-            content = element.get("content", "")
-        else:
-            role = element.role
-            content = element.content
-        
-        # Update structural context for headings
-        if role:
-            level = get_heading_level(role)
-            if level:
-                new_context = update_context(current_context, role, content)
-                current_context = new_context
-
-        # Calculate tokens for this element
-        element_tokens = len(encoding.encode(content))
-
-        # Decision: Should we start a new segment?
-        should_segment = False
-        
-        # Check if adding this element would exceed max tokens
-        if buffer_token_count + element_tokens > max_segment_tokens:
-            should_segment = True
-            logger.debug(f"Segmenting due to token limit: {buffer_token_count} + {element_tokens} > {max_segment_tokens}")
-        
-        # Check if we hit a major structural boundary (H1 or H2) with enough content
-        elif buffer_token_count >= min_segment_tokens:
-            level = get_heading_level(role or "")
-            if level and level <= 2:
-                should_segment = True
-                logger.debug(f"Segmenting at {role} boundary with {buffer_token_count} tokens")
-
-        # Create segment if needed
-        if should_segment and buffer_elements:
-            segments.append(FilteredSegment(
-                segment_id=segment_id_counter,
-                source_file=source_file,
-                token_count=buffer_token_count,
-                structural_context=current_context.model_copy(),
-                elements=buffer_elements,
-            ))
-            segment_id_counter += 1
-            buffer_elements = []
-            buffer_token_count = 0
-
-        # Add element to buffer
-        buffer_elements.append(element)
-        buffer_token_count += element_tokens
-
-    # Add final segment if buffer not empty
-    if buffer_elements:
-        segments.append(FilteredSegment(
-            segment_id=segment_id_counter,
-            source_file=source_file,
-            token_count=buffer_token_count,
-            structural_context=current_context.model_copy(),
-            elements=buffer_elements,
-        ))
-
-    logger.info(f"Created {len(segments)} filtered segments from {len(filtered_elements)} elements")
-    return segments
 
 # --- FastAPI Endpoints ---
 
@@ -408,107 +304,4 @@ async def segment_document(payload: SegmentationInput = Body(...)):
         # In a real app, you'd return a proper HTTPException
         raise ValueError(error_msg)
 
-@router.post("/segment-filtered", response_model=FilteredSegmentationResponse)
-async def segment_with_filtering(payload: FilteredSegmentationInput = Body(...)):
-    """
-    Segment a document with LLM-optimized filtering applied.
-    
-    This endpoint combines filtering and segmentation to prepare documents for LLM processing
-    with significantly reduced token usage (typically 50-75% reduction).
-    
-    **Input:**
-    - `source_file`: Name of the original document
-    - `json_content`: Complete Azure DI analysis result
-    - `filter_config`: Configuration for filtering elements
-    - `min_segment_tokens`: Minimum tokens per segment (default: 10,000)
-    - `max_segment_tokens`: Maximum tokens per segment (default: 30,000)
-    
-    **Filter Presets:**
-    - `legal_analysis`: Includes context, structure, and metadata
-    - `content_extraction`: Minimal filtering, focus on text
-    - `structured_qa`: Balanced filtering for Q&A tasks
-    - `minimal`: Maximum reduction, only essential content
-    
-    **Output:**
-    - `segments`: Array of filtered segments ready for LLM
-    - `element_mappings`: Mappings to trace back to original elements
-    - `metrics`: Statistics about filtering effectiveness
-    
-    **Example:**
-    ```python
-    payload = {
-        "source_file": "contract.pdf",
-        "json_content": {...},  # Azure DI output
-        "filter_config": {
-            "filter_preset": "legal_analysis",
-            "include_element_ids": true
-        },
-        "min_segment_tokens": 10000,
-        "max_segment_tokens": 30000
-    }
-    ```
-    """
-    logger.info(f"Received filtered segmentation request for {payload.source_file}")
-    logger.info(f"Filter preset: {payload.filter_config.filter_preset}")
-    logger.info(f"Token thresholds: min={payload.min_segment_tokens}, max={payload.max_segment_tokens}")
-    
-    # Validate parameters
-    if payload.min_segment_tokens <= 0:
-        raise HTTPException(status_code=400, detail=f"min_segment_tokens must be positive")
-        
-    if payload.max_segment_tokens <= 0:
-        raise HTTPException(status_code=400, detail=f"max_segment_tokens must be positive")
-        
-    if payload.min_segment_tokens >= payload.max_segment_tokens:
-        raise HTTPException(status_code=400, detail=f"min_segment_tokens must be less than max_segment_tokens")
-    
-    try:
-        # Step 1: Apply filters to the json_content
-        filtered_elements, element_mappings, metrics = apply_filters(
-            payload.json_content,
-            payload.filter_config
-        )
-        
-        logger.info(f"Filtering complete: {len(filtered_elements)} elements retained, "
-                    f"{metrics.reduction_percentage:.1f}% size reduction")
-        
-        # Step 2: Create segments from filtered elements
-        filtered_segments = create_filtered_segments(
-            filtered_elements,
-            payload.source_file,
-            payload.min_segment_tokens,
-            payload.max_segment_tokens
-        )
-        
-        logger.info(f"Created {len(filtered_segments)} filtered segments")
-        
-        # Step 3: Organize mappings by segment
-        # This allows frontend to know which elements are in each segment
-        segment_mappings = []
-        for segment in filtered_segments:
-            segment_element_ids = set()
-            for elem in segment.elements:
-                if isinstance(elem, dict):
-                    elem_id = elem.get("_id")
-                else:
-                    elem_id = elem.id
-                if elem_id:
-                    segment_element_ids.add(elem_id)
-            
-            segment_maps = [
-                mapping for mapping in element_mappings 
-                if mapping.azure_element_id in segment_element_ids
-            ]
-            segment_mappings.append(segment_maps)
-        
-        # Return the response
-        return FilteredSegmentationResponse(
-            segments=filtered_segments,
-            element_mappings=segment_mappings,
-            metrics=metrics
-        )
-        
-    except Exception as e:
-        error_msg = f"Error during filtered segmentation of {payload.source_file}: {str(e)}"
-        logger.error(error_msg, exc_info=True)
-        raise HTTPException(status_code=500, detail=error_msg) 
+ 
