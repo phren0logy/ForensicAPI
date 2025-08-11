@@ -1,7 +1,7 @@
 [project]
-name = "2025-06-13-fastapi-reusable"
-version = "0.1.0"
-description = "Add your description here"
+name = "forensicapi"
+version = "2.0.0"
+description = "Document anonymization and processing for AI assistants"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
@@ -27,6 +27,7 @@ dependencies = [
     "docling>=2.39.0",
     "ocrmac>=1.0.0",
     "docling-core[chunking-openai]>=2.39.0",
+    "fastmcp>=2.11.2",
 ]
 
 [dependency-groups]
@@ -34,3 +35,6 @@ dev = [
     "pytest-asyncio>=1.0.0",
     "reportlab>=4.4.2",
 ]
+
+[project.scripts]
+forensicapi = "forensicapi.mcp_server:main"

@@ -44,11 +44,11 @@ ForensicAPI 2.0 is designed from the ground up for Model Context Protocol (MCP) 
 
 ### What's New in 2.0
 
-- **Removed**: Separate pseudonymize endpoint, JSON outputs, complex filtering, element IDs
-- **Added**: UVX deployment, MCP tools, markdown-only output, privacy-first design, consistent replacements
-- **Changed**: "Anonymize" now always reversible (vault-based) with consistent faker values
-- **Simplified**: Four focused tools instead of many endpoints, no element tracking
-- **Enhanced**: Same entity always gets same replacement across all documents
+- **Removed**: Separate pseudonymize endpoint ✅, JSON outputs ✅, complex filtering ✅, element IDs ✅, Azure DI JSON format in anonymization ✅
+- **Added**: UVX deployment, MCP tools, markdown-only output ✅, privacy-first design, consistent replacements ✅
+- **Changed**: "Anonymize" now always reversible (vault-based) with consistent faker values ✅
+- **Simplified**: Four focused tools instead of many endpoints, no element tracking ✅
+- **Enhanced**: Same entity always gets same replacement across all documents ✅
 
 ## Privacy-First Architecture
 
@@ -111,9 +111,9 @@ Anonymizing document batch...
    - Error handling
 
 3. **Processing Engines**:
-   - **Docling**: Local PDF extraction (default)
-   - **Azure DI**: Cloud PDF extraction (optional, faster)
-   - **LLM-Guard**: PII detection and replacement
+   - **Docling**: Local PDF extraction (default) ✅
+   - **Azure DI**: Cloud PDF extraction (optional, faster) ✅
+   - **LLM-Guard**: PII detection and replacement ✅
 
 ## MCP Tools
 
@@ -286,7 +286,7 @@ Configuration is handled exclusively through environment variables in the MCP se
 
 ## Implementation Phases
 
-### Phase 1: Core Refactoring (Week 1-2)
+### Phase 1: Core Refactoring (Week 1-2) - IN PROGRESS
 
 1. **Simplify Anonymization** ✅
    - Remove pseudonymize endpoint ✅
@@ -296,51 +296,43 @@ Configuration is handled exclusively through environment variables in the MCP se
    - Remove element IDs entirely ✅ (already not present)
    - Update all references ✅
 
-2. **Markdown-Only Output**
-   - Remove JSON output options from all user-facing APIs
-   - Convert all outputs to markdown
-   - Simplify response structures
-   - Internal JSON usage only (vault, Azure DI)
-   - Update tests
+2. **Markdown-Only Output** (Mostly Complete)
+   - Remove JSON output options from all user-facing APIs ✅
+   - Convert all outputs to markdown ✅
+   - Simplify response structures ✅
+   - Internal JSON usage only (vault, Azure DI) ✅
+   - Update tests ❌ (pending)
 
 3. **File Path Operations**
    - Refactor to accept paths only
    - Return output paths, not content
    - Integration with filesystem patterns
 
-### Phase 2: MCP Integration (Week 2-3)
+### Phase 2: MCP Integration (Week 2-3) ✅ COMPLETE
 
-1. **Create MCP Server**
-   ```python
-   # forensicapi/mcp_server.py
-   from fastmcp import FastMCP
-   
-   mcp = FastMCP("ForensicAPI")
-   
-   @mcp.tool
-   async def anonymize_documents(
-       files: Optional[List[str]] = None,
-       directory: Optional[str] = None,
-       output_dir: str,
-       patterns: List[str] = ["*.pdf", "*.md", "*.txt"],
-       recursive: bool = True,
-       pattern_sets: List[str] = []
-   ) -> DocumentsResult:
-       """Anonymize documents, replacing PII with realistic fake data."""
-       # Implementation
-   ```
+1. **Create MCP Server** ✅
+   - Created `forensicapi/mcp_server.py` with FastMCP
+   - Configured pyproject.toml with entry point
+   - All imports and dependencies resolved
 
-2. **Implement 4 Tools**
-   - anonymize_documents
-   - restore_documents
-   - extract_document
-   - segment_document
+2. **Implement 4 Tools** ✅
+   - anonymize_documents ✅ - Batch anonymization with consistent replacements
+   - restore_documents ✅ - Vault-based restoration
+   - extract_document ✅ - PDF/DOCX to markdown with token reporting
+   - segment_document ✅ - Markdown segmentation with heading boundaries
 
-3. **Progress Streaming**
-   - Use MCP progress callbacks
+3. **Progress Streaming** ✅
+   - Implemented privacy-preserving progress messages
    - Real-time updates for long operations
-   - Privacy-preserving status messages (no content exposure)
-   - Example: "Processing page 15 of 45..." not "Found SSN 123-45-6789"
+   - No content exposure in progress updates
+   - Example: "Processing file 3 of 15: document.pdf"
+
+4. **Key Implementation Details** ✅
+   - File paths in, file paths out (privacy-first)
+   - Token-based size reporting (not bytes)
+   - Markdown-specific segmentation logic
+   - Consistent faker replacements across documents
+   - Vault v2.0 format support
 
 ### Phase 3: Packaging & Testing (Week 3-4)
 
@@ -374,10 +366,10 @@ Configuration is handled exclusively through environment variables in the MCP se
 ### For v1.0 Users
 
 **Breaking Changes:**
-1. No more `/pseudonymize` endpoint - use `/anonymize`
-2. JSON output removed - all output is markdown
-3. Complex filtering removed - use simple patterns
-4. File upload removed - use file paths
+1. No more `/pseudonymize` endpoint - use `/anonymize` ✅
+2. JSON output removed - all output is markdown ✅
+3. Complex filtering removed - use simple patterns ✅
+4. File upload removed - use file paths ❌ (Phase 1.3 pending)
 
 **Migration Steps:**
 1. Update to use file paths instead of uploads
@@ -390,9 +382,9 @@ Configuration is handled exclusively through environment variables in the MCP se
 A minimal REST API remains for programmatic access. These endpoints are considered legacy and may be deprecated in future versions. Use MCP tools when possible.
 
 **Endpoints:**
-- `POST /anonymize` - Returns markdown report of anonymization
-- `POST /restore` - Returns markdown report of restoration
-- `POST /extract` - Returns extracted markdown content
+- `POST /anonymize` - Returns markdown report of anonymization ✅ (implemented)
+- `POST /restore` - Returns markdown report of restoration ❌ (not implemented - MCP only)
+- `POST /extract` - Returns extracted markdown content ✅ (existing)
 
 All REST endpoints return markdown-only responses. No JSON output is available.
 
@@ -502,6 +494,7 @@ While ForensicAPI uses JSON internally for data structures, all user-facing inte
 - **Azure DI/Docling**: JSON processed internally, converted to markdown for output
 - **Progress Updates**: Markdown-formatted messages describing operations
 - **Error Messages**: Human-readable markdown format
+- **Note**: Azure DI is still available for extraction; we only removed Azure DI JSON format support in the anonymization endpoint
 
 ### Anonymization Process
 
