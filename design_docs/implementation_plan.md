@@ -45,9 +45,9 @@ ForensicAPI 2.0 is designed from the ground up for Model Context Protocol (MCP) 
 ### What's New in 2.0
 
 - **Removed**: Separate pseudonymize endpoint ✅, JSON outputs ✅, complex filtering ✅, element IDs ✅, Azure DI JSON format in anonymization ✅
-- **Added**: UVX deployment, MCP tools, markdown-only output ✅, privacy-first design, consistent replacements ✅
+- **Added**: UVX deployment ✅, MCP tools ✅, markdown-only output ✅, privacy-first design ✅, consistent replacements ✅
 - **Changed**: "Anonymize" now always reversible (vault-based) with consistent faker values ✅
-- **Simplified**: Four focused tools instead of many endpoints, no element tracking ✅
+- **Simplified**: Four focused tools instead of many endpoints ✅, no element tracking ✅
 - **Enhanced**: Same entity always gets same replacement across all documents ✅
 
 ## Privacy-First Architecture
@@ -115,17 +115,17 @@ Anonymizing document batch...
    - **Azure DI**: Cloud PDF extraction (optional, faster) ✅
    - **LLM-Guard**: PII detection and replacement ✅
 
-## MCP Tools
+## MCP Tools ✅ IMPLEMENTED
 
 ### Tool Design Philosophy
 
-- Each tool has a single, clear purpose
-- File paths in, file paths out (no content exposure to LLM)
-- Smart defaults for all parameters
-- Clear, actionable error messages
-- Privacy-preserving progress updates
+- Each tool has a single, clear purpose ✅
+- File paths in, file paths out (no content exposure to LLM) ✅
+- Smart defaults for all parameters ✅
+- Clear, actionable error messages ✅
+- Privacy-preserving progress updates ✅
 
-### 1. `anonymize_documents`
+### 1. `anonymize_documents` ✅
 
 **Purpose**: Replace PII with realistic fake data, creating a reversible vault
 
@@ -156,7 +156,7 @@ interface AnonymizeDocumentsParams {
 └── REPORT.md
 ```
 
-### 2. `restore_documents`
+### 2. `restore_documents` ✅
 
 **Purpose**: Restore original PII using vault
 
@@ -174,7 +174,7 @@ interface RestoreDocumentsParams {
 }
 ```
 
-### 3. `extract_document`
+### 3. `extract_document` ✅
 
 **Purpose**: Convert PDF/DOCX to markdown
 
@@ -187,11 +187,12 @@ interface ExtractDocumentParams {
 ```
 
 **Features:**
-- Automatic OCR for scanned PDFs
-- Preserves document structure
-- Handles tables and formatting
+- Automatic OCR for scanned PDFs ✅
+- Preserves document structure ✅
+- Handles tables and formatting ✅
+- Reports output size in tokens ✅
 
-### 4. `segment_document`
+### 4. `segment_document` ✅
 
 **Purpose**: Split large documents into LLM-ready chunks
 
@@ -200,6 +201,7 @@ interface SegmentDocumentParams {
   file_path: string;       // Markdown file to segment
   output_dir: string;      // Directory for chunks
   max_tokens?: number;     // Tokens per chunk (default: 15000)
+  min_tokens?: number;     // Minimum tokens per chunk (default: 10000)
 }
 ```
 
@@ -286,7 +288,7 @@ Configuration is handled exclusively through environment variables in the MCP se
 
 ## Implementation Phases
 
-### Phase 1: Core Refactoring (Week 1-2) - IN PROGRESS
+### Phase 1: Core Refactoring (Week 1-2) ✅ COMPLETE (except tests)
 
 1. **Simplify Anonymization** ✅
    - Remove pseudonymize endpoint ✅
@@ -296,17 +298,17 @@ Configuration is handled exclusively through environment variables in the MCP se
    - Remove element IDs entirely ✅ (already not present)
    - Update all references ✅
 
-2. **Markdown-Only Output** (Mostly Complete)
+2. **Markdown-Only Output** ✅
    - Remove JSON output options from all user-facing APIs ✅
    - Convert all outputs to markdown ✅
    - Simplify response structures ✅
    - Internal JSON usage only (vault, Azure DI) ✅
-   - Update tests ❌ (pending)
+   - Update tests ❌ (deferred to Phase 3)
 
-3. **File Path Operations**
-   - Refactor to accept paths only
-   - Return output paths, not content
-   - Integration with filesystem patterns
+3. **File Path Operations** ✅ (via MCP)
+   - Refactor to accept paths only ✅ (MCP tools)
+   - Return output paths, not content ✅ (MCP tools)
+   - Integration with filesystem patterns ✅ (MCP tools)
 
 ### Phase 2: MCP Integration (Week 2-3) ✅ COMPLETE
 
@@ -334,32 +336,24 @@ Configuration is handled exclusively through environment variables in the MCP se
    - Consistent faker replacements across documents
    - Vault v2.0 format support
 
-### Phase 3: Packaging & Testing (Week 3-4)
+### Phase 3: Packaging & Testing (Week 3-4) - PENDING
 
-1. **UVX Configuration**
-   ```toml
-   # pyproject.toml
-   [project]
-   name = "forensicapi"
-   version = "2.0.0"
-   
-   [project.scripts]
-   forensicapi = "forensicapi.mcp_server:main"
-   
-   [project.urls]
-   Repository = "https://github.com/your/forensicapi"
-   ```
+1. **UVX Configuration** ✅ (Partially Complete)
+   - Basic pyproject.toml configuration ✅
+   - Entry point configured ✅
+   - Repository URL pending ❌
+   - PyPI publishing setup pending ❌
 
-2. **Testing Suite**
-   - MCP tool tests
-   - Integration with Claude Desktop
-   - Performance benchmarks
-   - Error handling
+2. **Testing Suite** ❌
+   - MCP tool tests ❌
+   - Integration with Claude Desktop ❌
+   - Performance benchmarks ❌
+   - Error handling tests ❌
 
-3. **Documentation**
-   - Simple README
-   - Claude Desktop setup guide
-   - Example workflows
+3. **Documentation** ❌
+   - Simple README ❌
+   - Claude Desktop setup guide ❌
+   - Example workflows ❌
 
 ## Migration Guide
 
@@ -369,7 +363,7 @@ Configuration is handled exclusively through environment variables in the MCP se
 1. No more `/pseudonymize` endpoint - use `/anonymize` ✅
 2. JSON output removed - all output is markdown ✅
 3. Complex filtering removed - use simple patterns ✅
-4. File upload removed - use file paths ❌ (Phase 1.3 pending)
+4. File upload removed - use file paths ✅ (via MCP tools)
 
 **Migration Steps:**
 1. Update to use file paths instead of uploads
