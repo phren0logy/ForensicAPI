@@ -1,945 +1,285 @@
 # ForensicAPI
 
-This is a tool to facilitate LLM experiments with PDFs, especially those that contain sensitive information. Remember to only use services that provide appropriate privacy. Because of the Azure policy covering HIPAA and providing a BAA for Azure customers, many of the functions of this library are Azure-centric.
+**Privacy-first document processing for AI assistants**
 
-This application provides an API that uses Azure Document Intelligence to convert PDFs to Markdown and structured JSON, handling PDFs of arbitrary size (rather than being limited to Azure's single-request limit of 2000 pages). The system preserves document structure through intelligent segmentation that maintains hierarchical heading context (H1-H6). Every JSON element is automatically assigned a unique ID for tracing back to the source document. The filtering endpoint facilitates stripping out unnecessary JSON components to optimize for LLM token usage.
+ForensicAPI anonymizes sensitive documents before they reach your AI, ensuring consistent replacements across all files. Install in seconds with UVX, no Python knowledge required.
 
-Additionally, the application offers local document processing through Docling, enabling privacy-sensitive operations without external API calls. This includes intelligent document chunking for RAG applications, with semantic segmentation that respects document structure and maintains hierarchical context within each chunk.
+## Quick Start
 
-There is also an endpoint to anonymize documents using LLM-Guard with the AI4Privacy BERT model for comprehensive PII detection (54 entity types with 97.8% F1 score), as well as an endpoint to compose prompts around large documents with instructions and the beginning and the end (as recommended by the GPT-4.1 documentation).
+### 1. Install ForensicAPI
 
-## Test the Endpoints
+```bash
+uvx forensicapi
+```
 
-### Using the API Documentation
+That's it! No Python, pip, or virtual environments needed.
 
-FastAPI provides automatic interactive API documentation:
+### 2. Configure Claude Desktop
 
-1. **Start the FastAPI server:**
+Add to your `claude_desktop_config.json`:
 
-   ```
-   uv run run.py
-   ```
+```json
+{
+  "mcpServers": {
+    "forensic-api": {
+      "command": "uvx",
+      "args": ["forensicapi"]
+    }
+  }
+}
+```
 
-   or
+### 3. Start Using
 
-   ```
-   uvicorn main:app --reload
-   ```
+In Claude Desktop:
 
-2. **Visit the interactive documentation:**
+- "Anonymize all PDFs in my contracts folder"
+- "Extract this research paper to markdown"
+- "Split this 500-page document into chunks"
 
-   - [Swagger UI](http://127.0.0.1:8000/docs) - Interactive API testing
-   - [ReDoc](http://127.0.0.1:8000/redoc) - Alternative API documentation
+## Core Features
 
-3. **Test endpoints directly** through the Swagger UI interface by:
-   - Clicking on any endpoint
-   - Clicking "Try it out"
-   - Filling in the request parameters
-   - Clicking "Execute"
+### 🔒 Privacy-First Anonymization
+
+ForensicAPI replaces sensitive information with realistic fake data **before** your AI sees it:
+
+- **Consistent replacements**: "John Smith" → "Robert Johnson" in ALL documents
+- **54 PII types detected**: Names, SSNs, emails, medical records, financial data
+- **Reversible**: Restore originals anytime using the secure vault
+- **Domain patterns**: Legal (case numbers, Bates) and medical (MRNs, insurance IDs)
+
+### 📄 Document Processing
+
+- **Universal format support**: PDF, DOCX, PPTX, HTML, Markdown
+- **Local or cloud**:
+  - Docling (default): Private, no external APIs
+  - Azure DI (optional): 10-50x faster for large documents
+- **Intelligent chunking**: Split documents for optimal LLM processing
+- **No size limits**: Handle 1000+ page documents effortlessly
+
+### 🤖 MCP-First Design
+
+ForensicAPI works through natural language in Claude Desktop:
+
+```
+You: "I have sensitive contracts that need review"
+Claude: "I'll help anonymize those contracts first to protect sensitive information..."
+[ForensicAPI processes files without Claude seeing the content]
+Claude: "I've anonymized 23 contracts. All names, emails, and financial data have been
+consistently replaced. John Smith appears as Robert Johnson in all documents."
+```
+
+## MCP Tools
+
+### `anonymize_documents`
+
+Replace PII with consistent fake data across multiple documents.
+
+```typescript
+// Anonymize specific files
+anonymize_documents({
+  files: ["/path/to/contract.pdf", "/path/to/notes.md"],
+  output_dir: "/secure/output",
+});
+
+// Anonymize entire directory
+anonymize_documents({
+  directory: "/contracts/2024",
+  patterns: ["*.pdf", "*.docx"],
+  pattern_sets: ["legal"], // Enable legal patterns
+  output_dir: "/contracts/anonymized",
+});
+```
+
+**Output:**
+
+- `/output/anonymized/` - Anonymized documents
+- `/output/vault.json` - Secure mapping for restoration
+- `/output/REPORT.md` - Processing summary
+
+### `restore_documents`
+
+Restore original PII using the vault.
+
+```typescript
+restore_documents({
+  directory: "/contracts/anonymized",
+  vault_path: "/contracts/vault.json", // Optional, auto-detected
+  output_dir: "/contracts/restored",
+});
+```
+
+### `extract_document`
+
+Convert PDFs and Office documents to markdown.
+
+```typescript
+extract_document({
+  file_path: "/research/paper.pdf",
+  extraction_method: "local", // or "azure" for faster processing
+});
+```
+
+### `segment_document`
+
+Split large documents into LLM-ready chunks.
+
+```typescript
+segment_document({
+  file_path: "/research/paper.md",
+  output_dir: "/research/chunks",
+  max_tokens: 15000, // Optimal for GPT-4
+});
+```
+
+## Configuration
+
+### Minimal Setup (Local Processing)
+
+No configuration needed! ForensicAPI works out of the box with local processing.
+
+### Enable Azure Document Intelligence (Optional)
+
+For 10-50x faster PDF processing, add Azure credentials to `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "forensic-api": {
+      "command": "uvx",
+      "args": ["forensicapi"],
+      "env": {
+        "AZURE_DI_KEY": "your-key-here",
+        "AZURE_DI_ENDPOINT": "https://your-resource.cognitiveservices.azure.com/"
+      }
+    }
+  }
+}
+```
+
+## Examples
+
+### Legal Document Review
+
+```
+You: "I need to review these merger agreements for inconsistencies"
+
+Claude: "I'll anonymize those merger agreements first to protect confidential information.
+
+[Calling anonymize_documents tool...]
+
+I've successfully anonymized 8 merger agreements:
+- Replaced 127 company names, 89 person names, 45 financial figures
+- 'Acme Corp' consistently appears as 'TechCo Industries' across all documents
+- All Bates numbers and case references were detected and replaced
+
+The documents are now ready for analysis. Would you like me to review them for
+inconsistencies in terms, pricing, or obligations?"
+```
+
+### Medical Records Processing
+
+```
+You: "Process patient discharge summaries from the hospital folder"
+
+Claude: "I'll anonymize the patient discharge summaries to ensure HIPAA compliance.
+
+[Calling anonymize_documents with medical patterns...]
+
+Processed 156 discharge summaries:
+- Protected: 312 patient names, 156 MRNs, 423 diagnoses, 89 physician names
+- Dates shifted consistently by 6 months
+- Medical record numbers replaced with format-preserving alternatives
+
+The anonymized summaries are ready for analysis while maintaining full privacy."
+```
+
+### Document Extraction and Analysis
+
+```
+You: "Extract and summarize this 300-page research PDF"
+
+Claude: "I'll extract the PDF content and prepare it for analysis.
+
+[Calling extract_document tool...]
+
+Successfully extracted 300-page research document:
+- Format: Clean markdown with preserved structure
+- Size: 487,239 tokens
+- Extraction time: 3.2 seconds (using Azure DI)
+
+[Calling segment_document tool...]
+
+Split into 15 logical segments (average 32,000 tokens each) breaking at chapter
+boundaries. Ready to analyze specific sections or provide an overall summary."
+```
+
+## Privacy & Security
+
+### How It Works
+
+1. **File paths only**: Claude sees file paths, never document contents
+2. **Local processing**: Your documents stay on your machine
+3. **Consistent vault**: Same person gets same replacement everywhere
+4. **No logs**: ForensicAPI doesn't store or log document content
+5. **Reversible**: Original data recoverable only with your vault file
+
+### Security Best Practices
+
+- Keep vault files secure - they contain the restoration mappings
+- Use local extraction for maximum privacy
+- Review anonymized output before sharing externally
+- Enable only the PII types you need to reduce false positives
+
+## Troubleshooting
+
+### "Command not found: uvx"
+
+Install UVX first:
+
+```bash
+# macOS/Linux
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Windows
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+```
+
+### "Model download in progress"
+
+First run downloads the AI4Privacy model (134MB). This happens once.
+
+### Azure DI Timeout
+
+Large PDFs may timeout. Solutions:
+
+- Use local extraction (default)
+- Process in smaller batches
+- Increase timeout in Azure portal
+
+## REST API (Legacy)
+
+ForensicAPI includes a REST API for programmatic access. This is considered legacy - use MCP tools when possible.
+
+- `POST /anonymize` - Anonymize documents
+- `POST /extract` - Extract PDF/DOCX to markdown
+- `POST /extract-local` - Local extraction with Docling
+- `GET /health` - Service health check
+
+See [API Documentation](docs/api-reference.md) for details.
+
+## Contributing
+
+ForensicAPI is open source! We welcome contributions.
+
+- [GitHub Repository](https://github.com/yourusername/forensicapi)
+- [Issue Tracker](https://github.com/yourusername/forensicapi/issues)
+- [Implementation Plan](design_docs/implementation_plan.md)
+
+## License
+
+MIT License - see [LICENSE](LICENSE) file for details.
 
 ---
 
-## Getting Started
-
-### Prerequisites
-
-- Python 3.13+
-- Azure Document Intelligence account and credentials
-- Install dependencies using [uv](https://github.com/astral-sh/uv):
-  ```sh
-  uv sync
-  ```
-
-### Environment Configuration
-
-The application requires Azure Document Intelligence credentials. Create a `.env` file in the project root with:
-
-```env
-# Azure Document Intelligence Configuration
-AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT=https://your-resource-name.cognitiveservices.azure.com/
-AZURE_DOCUMENT_INTELLIGENCE_KEY=your-api-key-here
-
-# Optional: Logging level (DEBUG, INFO, WARNING, ERROR)
-LOG_LEVEL=INFO
-```
-
-**Important**: Never commit the `.env` file to version control. It's already included in `.gitignore`.
-
-### Key Dependencies
-
-- **[Azure Document Intelligence](https://azure.microsoft.com/en-us/products/ai-services/ai-document-intelligence/)**: Enterprise-grade PDF to structured data extraction
-- **[Docling](https://github.com/DS4SD/docling)**: Local document processing with intelligent chunking and OCR support
-- **[LLM-Guard](https://llm-guard.com/)**: Advanced PII detection and anonymization with AI4Privacy BERT model (54 PII types)
-- **[FastAPI](https://fastapi.tiangolo.com/)**: Modern, fast web framework with automatic API documentation
-- **[UV](https://github.com/astral-sh/uv)**: Ultra-fast Python package and project management
-- **Python 3.13+**: Required for latest performance improvements and type hints
-
-### Examples
-
-Example scripts are provided in the `examples/` directory:
-
-- `pseudonymization_demo.py`: Demonstrates stateless pseudonymization and deanonymization workflows
-
-### Running the Server
-
-To start the FastAPI server:
-
-```sh
-uv run run.py
-```
-
-## API Endpoints
-
-### `/` (GET)
-
-- **Description:** Root endpoint that returns information about all available API endpoints.
-- **Response:**
-  - JSON object with welcome message and list of available endpoints with their descriptions.
-
-### `/health` (GET)
-
-- **Description:** Health check endpoint to verify the service is running.
-- **Response:**
-  - JSON object with status "healthy" and timestamp.
-
-### `/compose-prompt` (POST)
-
-- **Description:** Compose a prompt from multiple text fields and/or files, each wrapped in a specified XML tag.
-- **Request:**
-  - `multipart/form-data` with a `mapping` field (JSON: `{tag: value}`), where each key is an XML tag and the value is either:
-    - A string (content), or
-    - The name of an uploaded file field
-  - Optionally, upload files with field names matching the mapping values.
-- **Special Case:**
-  - If a tag is named `instructions`, its section is wrapped in `<instructions>` and appears at both the top and bottom of the result.
-- **Response:**
-  - Plain text: The composed prompt with each section wrapped in its XML tag.
-- **Example (text only):**
-  ```json
-  {
-    "document": "Text of your document goes here",
-    "transcript": "Transcript of therapy session goes here",
-    "manual": "Scoring manual for scoring therapy session fidelity",
-    "instructions": "Score the attached transcript, wrapped in transcript tags, according to the manual, wrapped in manual tags. Provide a score for each scale in the manual."
-  }
-  ```
-
-### `/extract` (POST)
-
-- **Description:** Extracts structured data and markdown from PDF documents using Azure Document Intelligence with intelligent batch processing and optional segmentation. Implements Phase 1 of the PDF processing strategy with perfect document reconstruction for documents of any size. Can automatically segment results into semantically meaningful chunks for LLM processing.
-- **Request:**
-  - `multipart/form-data` with the following fields:
-    - `file`: PDF file to process (required)
-    - `batch_size`: Number of pages per batch (optional, default: 1500)
-    - `include_element_ids`: Add unique IDs to all elements (optional, default: true)
-    - `return_both`: Return both original and ID-enriched versions (optional, default: false)
-    - `enable_segmentation`: Enable automatic segmentation of results (optional, default: false)
-    - `segment_min_tokens`: Minimum tokens per segment (optional, default: 10000)
-    - `segment_max_tokens`: Maximum tokens per segment (optional, default: 30000)
-- **Advanced Features:**
-  - **Intelligent Batch Processing**: Automatically processes large documents in configurable page batches
-  - **Perfect Stitching**: Reconstructs complete documents with 100% accuracy using advanced stitching algorithms
-  - **Element ID Generation**: Automatically adds stable `_id` fields to all elements for tracking through filtering/segmentation
-  - **Automatic Segmentation**: Optional segmentation into semantically meaningful chunks respecting document structure
-  - **Token-Based Control**: Configurable min/max tokens per segment for optimal LLM context window usage
-  - **Structural Awareness**: Segments break at logical boundaries (H1/H2 headings) while maintaining context
-  - **Automatic Offset Calculation**: Seamlessly handles page numbering and content offsets across batches
-  - **Concurrent Processing**: Processes multiple batches simultaneously for optimal performance
-  - **Input Validation**: Comprehensive validation of Azure DI structure and batch sequences
-  - **Production Ready**: Handles documents up to 353+ pages with robust error handling
-- **Performance:**
-  - Sub-second execution with minimal memory usage
-  - Validated with complete 353-page document reconstruction
-  - Perfect accuracy: 100% ground truth matching for content integrity
-- **Response:**
-  - A JSON object containing:
-    ```json
-    {
-      "markdown_content": "Complete markdown of entire document",
-      "json_content": {
-        "content": "Full document content...",
-        "paragraphs": [
-          {
-            "_id": "para_1_0_a3f2b1",  // Unique element ID
-            "content": "...",
-            "role": "paragraph",
-            "boundingRegions": [...],
-            // ... other Azure DI fields
-          }
-        ],
-        "tables": [
-          {
-            "_id": "table_5_2_d4e5f6",
-            "cells": [
-              {
-                "_id": "cell_5_2_0_0_b7c8d9",
-                "content": "...",
-                // ... other cell fields
-              }
-            ],
-            // ... other table fields
-          }
-        ],
-        // ... other elements with _id fields
-      },
-      "segments": [  // Only present when enable_segmentation=true
-        {
-          "segment_id": 1,
-          "source_file": "document.pdf",
-          "token_count": 12543,
-          "structural_context": {
-            "h1": "Chapter 1",
-            "h2": "Section A",
-            "h3": null,
-            "h4": null,
-            "h5": null,
-            "h6": null
-          },
-          "elements": [
-            // Azure DI elements in this segment
-          ]
-        }
-        // ... more segments
-      ],
-      "metadata": {
-        "page_count": 10,
-        "processing_type": "azure_di",
-        "processing_time": 2.5,
-        "file_size": 1048576,
-        "filename": "document.pdf",
-        "batch_size": 1500,
-        "element_ids_included": true,
-        // Segmentation metadata (when enabled)
-        "segmentation_enabled": true,
-        "segment_count": 3,
-        "segment_config": {
-          "min_tokens": 10000,
-          "max_tokens": 30000
-        }
-      }
-    }
-    ```
-  - When `include_element_ids=true` (default): Returns Azure DI format with added `_id` fields
-  - When `include_element_ids=false`: Returns pure Azure DI format without IDs
-  - When `return_both=true`: Returns both `json_content` (with IDs) and `json_content_original` (without IDs)
-  - When `enable_segmentation=true`: Includes `segments` array with document broken into semantically meaningful chunks
-
-### `/extract-local` (POST)
-
-- **Description:** Extracts structured data and markdown from documents locally using Docling, without requiring external API calls. Supports intelligent document chunking for RAG pipelines and LLM applications. Processes PDFs, DOCX, PPTX, HTML, and MD files with optional OCR support.
-- **Request:**
-  - `multipart/form-data` with the following fields:
-    - `file`: Document file to process (required)
-    - `ocr_enabled`: Enable OCR for scanned content (optional, default: true)
-    - `ocr_lang`: OCR language code (optional, default: "en")
-    - `max_pages`: Maximum number of pages to process (optional)
-    - `enable_chunking`: Enable intelligent document chunking (optional, default: false)
-    - `chunk_min_tokens`: Minimum tokens per chunk (optional, default: 1000)
-    - `chunk_max_tokens`: Maximum tokens per chunk (optional, default: 30000)
-    - `merge_peers`: Merge sibling elements when possible (optional, default: true)
-- **Features:**
-  - **Local Processing**: No data sent to external services, ensuring complete privacy
-  - **OCR Support**:
-    - macOS: Uses native Vision framework via ocrmac (fast, accurate)
-    - Other platforms: Falls back to EasyOCR
-  - **Intelligent Chunking** (when enabled):
-    - Semantic segmentation respecting document structure (headings, paragraphs, tables)
-    - Token-based size control using tiktoken with GPT-4's cl100k_base encoding
-    - Hierarchical context preservation in each chunk
-    - Rich metadata including source references and page locations
-  - **Format Support**: PDF, DOCX, DOC, PPTX, HTML, MD
-  - **No Page Limits**: Processes complete documents without Azure's 2000-page restriction
-- **Response:**
-  - A JSON object containing:
-    ```json
-    {
-      "markdown_content": "Complete document in markdown format",
-      "json_content": {
-        // Native Docling document structure
-      },
-      "chunks": [
-        // Only present when chunking is enabled
-        {
-          "text": "Section 1 > Subsection 1.1\n\nThe actual chunk content with context...",
-          "token_count": 1250,
-          "meta": {
-            "doc_items": [
-              {
-                "self_ref": "#/texts/28",
-                "label": "text",
-                "prov": [
-                  {
-                    "page_no": 2,
-                    "bbox": {
-                      "l": 53.29,
-                      "t": 287.14,
-                      "r": 295.56,
-                      "b": 212.37
-                    }
-                  }
-                ]
-              }
-            ],
-            "headings": ["Section 1", "Subsection 1.1"],
-            "origin": {
-              "filename": "document.pdf"
-            }
-          }
-        }
-        // ... more chunks
-      ],
-      "metadata": {
-        "page_count": 10,
-        "processing_type": "docling",
-        "processing_time": 2.5,
-        "file_size": 1048576,
-        "filename": "document.pdf",
-        "ocr_applied": false,
-        "ocr_enabled": true,
-        "ocr_platform": "ocrmac",
-        // Chunking metadata (when enabled)
-        "chunk_count": 15,
-        "chunking_enabled": true,
-        "chunk_config": {
-          "min_tokens": 1000,
-          "max_tokens": 30000,
-          "tokenizer": "tiktoken-cl100k_base",
-          "merge_peers": true
-        }
-      }
-    }
-    ```
-- **Chunking Use Cases:**
-  - **RAG Applications**: Create optimal chunks for vector database ingestion
-  - **LLM Context Windows**: Ensure chunks fit within model token limits
-  - **Semantic Search**: Maintain document structure for better retrieval
-  - **Document Q&A**: Preserve section hierarchy for contextual understanding
-
-### `/segment` (POST)
-
-- **Description:** Transforms complete Azure Document Intelligence analysis results into rich, structurally-aware segments with configurable token thresholds. This creates large, coherent document chunks suitable for advanced analysis.
-- **Request:**
-  - A JSON object with the following structure:
-    ```json
-    {
-      "source_file": "document.pdf",
-      "json_content": { "... complete Azure DI analysis result ..." },
-      "min_segment_tokens": 10000,
-      "max_segment_tokens": 30000
-    }
-    ```
-  - **Parameters:**
-    - `source_file`: Name of the original document (required)
-    - `analysis_result`: Complete Azure DI analysis result from `/extract` endpoint (required)
-    - `min_segment_tokens`: Minimum tokens per segment (optional, default: 10,000)
-    - `max_segment_tokens`: Maximum tokens per segment - soft limit (optional, default: 30,000)
-- **Features:**
-  - Configurable token thresholds for different use cases
-  - Intelligent boundary detection at heading levels (H1/H2)
-  - Preserves full Azure DI metadata (bounding boxes, page numbers, etc.)
-  - Maintains hierarchical context (current H1-H6 headings)
-  - Processes all Azure DI element types (paragraphs, tables, figures, formulas, keyValuePairs)
-- **Response:**
-  - A JSON array of "Rich Segment" objects with the following structure:
-    ```json
-    [
-      {
-        "segment_id": 1,
-        "source_file": "document.pdf",
-        "token_count": 12543,
-        "structural_context": {
-          "h1": "Chapter 1",
-          "h2": "Section A",
-          "h3": null,
-          "h4": null,
-          "h5": null,
-          "h6": null
-        },
-        "elements": [
-          {
-            "role": "paragraph",
-            "content": "...",
-            "bounding_regions": [...],
-            "page_number": 1
-          }
-        ]
-      }
-    ]
-    ```
-
-### `/segment-filtered` (POST)
-
-- **Description:** Combines filtering and segmentation to prepare documents for LLM processing with significantly reduced token usage. Applies configurable filters to remove unnecessary fields while preserving element IDs for traceability.
-- **Request:**
-  - A JSON object with the following structure:
-    ```json
-    {
-      "source_file": "document.pdf",
-      "json_content": { "... Azure DI result with _id fields ..." },
-      "filter_config": {
-        "filter_preset": "llm_ready",
-        "include_element_ids": true
-      },
-      "min_segment_tokens": 10000,
-      "max_segment_tokens": 30000
-    }
-    ```
-  - **Parameters:**
-    - `filter_config.filter_preset`: Name of preset or "custom" (optional, default: "llm_ready")
-    - `filter_config.fields`: Custom list of fields to include when using "custom" preset (optional)
-    - `filter_config.include_element_ids`: Whether to include \_id fields (optional, default: true)
-- **Filter Presets:**
-  - `no_filter`: Preserves all original fields (returns raw dictionary format)
-  - `llm_ready`: Optimal balance - includes content, structure, and headers/footers for citations (default)
-  - `forensic_extraction`: Includes document metadata for complex multi-document analysis
-  - `citation_optimized`: Minimal fields - content, page numbers, and IDs only
-- **Simplified Allowlist Filtering:**
-  - **Single Field List**: Each preset defines a simple list of fields to include
-  - **No Complex Rules**: Removed confusing include/exclude patterns in favor of explicit field lists
-  - **Exact Field Definitions**:
-    - `no_filter`: `["*"]` - includes all fields from Azure DI
-    - `citation_optimized`: `["_id", "content", "pageNumber", "elementIndex", "pageFooter"]`
-    - `llm_ready`: `["_id", "content", "pageNumber", "role", "elementType", "elementIndex", "pageHeader", "pageFooter", "parentSection"]`
-    - `forensic_extraction`: `["_id", "content", "pageNumber", "role", "elementType", "elementIndex", "pageHeader", "pageFooter", "parentSection", "documentMetadata"]`
-- **Custom Filtering Example:**
-  ```json
-  {
-    "filter_config": {
-      "filter_preset": "custom",
-      "fields": ["_id", "content", "pageNumber", "myCustomField"],
-      "include_element_ids": true
-    }
-  }
-  ```
-- **Features:**
-  - **Element ID Preservation**: The `_id` field is included based on filter preset
-  - **Hybrid Return Types**: `no_filter` returns raw dictionaries, other presets return typed FilteredElement objects
-  - **Token Optimization**: Typically achieves 50-75% reduction in token usage
-  - **Metrics Tracking**: Reports size reduction, element counts, and excluded fields
-- **Response:**
-  - A JSON object containing:
-    ```json
-    {
-      "segments": [
-        {
-          "segment_id": 1,
-          "source_file": "document.pdf",
-          "token_count": 12543,
-          "structural_context": { "h1": "Chapter 1", "h2": "Section A" },
-          "elements": [
-            {
-              "_id": "para_1_0_a3f2b1",  // Preserved from extraction
-              "content": "...",
-              "pageNumber": 1,
-              "role": "paragraph"
-              // Only fields allowed by filter preset
-            }
-          ]
-        }
-      ],
-      "element_mappings": [
-        [ /* mappings for segment 1 */ ],
-        [ /* mappings for segment 2 */ ]
-      ],
-      "metrics": {
-        "original_size_bytes": 500000,
-        "filtered_size_bytes": 150000,
-        "reduction_percentage": 70.0,
-        "excluded_fields": ["boundingBox", "polygon", "confidence", ...]
-      }
-    }
-    ```
-
-### `/filter/presets` (GET)
-
-- **Description:** Returns all available filter presets and their descriptions for use with the filtering and segmentation endpoints.
-- **Response:**
-  - JSON object containing preset names as keys and their configurations as values:
-    ```json
-    {
-      "no_filter": {
-        "description": "Preserves all original fields from Azure DI",
-        "fields": ["*"]
-      },
-      "llm_ready": {
-        "description": "Optimal balance for LLM processing - includes content, structure, and headers/footers",
-        "fields": [
-          "_id",
-          "content",
-          "pageNumber",
-          "role",
-          "elementType",
-          "elementIndex",
-          "pageHeader",
-          "pageFooter",
-          "parentSection"
-        ]
-      },
-      "forensic_extraction": {
-        "description": "Includes document metadata for complex multi-document analysis",
-        "fields": [
-          "_id",
-          "content",
-          "pageNumber",
-          "role",
-          "elementType",
-          "elementIndex",
-          "pageHeader",
-          "pageFooter",
-          "parentSection",
-          "documentMetadata"
-        ]
-      },
-      "citation_optimized": {
-        "description": "Minimal fields - content, page numbers, and IDs only",
-        "fields": ["_id", "content", "pageNumber", "elementIndex", "pageFooter"]
-      }
-    }
-    ```
-
-### `/anonymization/anonymize-azure-di` (POST)
-
-- **Description:** Anonymizes sensitive information in Azure Document Intelligence output using LLM-Guard with the AI4Privacy BERT model. Supports stateless operation by accepting and returning vault data for consistent anonymization across requests.
-- **Request:**
-  - A JSON object with the following structure:
-    ```json
-    {
-      "azure_di_json": {
-        /* Azure DI analysis result */
-      },
-      "config": {
-        "entity_types": [
-          "PERSON",
-          "DATE_TIME",
-          "LOCATION",
-          "PHONE_NUMBER",
-          "EMAIL_ADDRESS",
-          "US_SSN",
-          "MEDICAL_LICENSE"
-        ],
-        "score_threshold": 0.5,
-        "anonymize_all_strings": true,
-        "date_shift_days": 365,
-        "return_decision_process": false
-      },
-      "vault_data": [
-        /* Optional: Previous vault data for consistent replacements */ [
-          "John Doe",
-          "Jane Smith"
-        ],
-        ["_date_offset", "-365"]
-      ]
-    }
-    ```
-- **Features:**
-  - Uses LLM-Guard with AI4Privacy BERT model (Isotonic/distilbert_finetuned_ai4privacy_v2)
-  - Detects 54 different PII types with 97.8% F1 score
-  - Advanced pattern recognition beyond basic NER
-  - Configurable confidence threshold to reduce false positives
-  - Realistic fake data generation using Faker library
-  - Cryptographically secure random generation for sensitive IDs
-  - Session-isolated replacements for security
-  - Preserves document structure and element IDs
-  - Optional decision process debugging
-- **Supported Entity Types:**
-  - All 54 PII types from AI4Privacy model including:
-    - Personal: Names, ages, gender, occupation, education
-    - Financial: Bank accounts, credit cards, IBANs
-    - Contact: Emails, phones, addresses, URLs
-    - Technical: IP addresses, crypto wallets, API keys
-    - Medical: Diagnoses, medications, conditions
-    - Legal: Case numbers, court names
-  - Note: You can specify a subset of entity types in the config
-- **Response:**
-  - JSON object containing:
-    ```json
-    {
-      "anonymized_json": { /* Anonymized Azure DI JSON */ },
-      "statistics": { "PERSON": 5, "DATE_TIME": 2, ... },
-      "vault_data": [  /* Updated vault with all anonymization mappings */
-        ["John Doe", "Jane Smith"],
-        ["john@example.com", "jane@example.com"],
-        ["_date_offset", "-365"]
-      ]
-    }
-    ```
-
-### `/anonymization/anonymize-markdown` (POST)
-
-- **Description:** Anonymizes sensitive information in markdown or plain text while preserving formatting. Supports stateless operation with vault data.
-- **Request:**
-  - A JSON object with the following structure:
-    ```json
-    {
-      "markdown_text": "Your markdown or plain text content...",
-      "config": {
-        "entity_types": ["PERSON", "DATE_TIME", ...],
-        "score_threshold": 0.5,
-        "anonymize_all_strings": true,
-        "return_decision_process": false
-      },
-      "vault_data": [  /* Optional: Previous vault data */
-        ["placeholder", "original"], ...
-      ]
-    }
-    ```
-- **Features:**
-  - Same powerful anonymization engine as the Azure DI endpoint
-  - Preserves markdown formatting (headers, lists, code blocks, etc.)
-  - Configurable entity detection with score threshold
-  - Consistent replacements across the document
-  - Optional decision process for debugging
-- **Response:**
-  - JSON object containing:
-    ```json
-    {
-      "anonymized_text": "Anonymized markdown content...",
-      "statistics": { "PERSON": 3, "EMAIL_ADDRESS": 2, ... },
-      "decision_process": [ /* optional debugging info */ ],
-      "vault_data": [ /* Updated vault data */ ]
-    }
-    ```
-
-### `/anonymization/health` (GET)
-
-- **Description:** Health check endpoint for the anonymization service. Verifies that the LLM-Guard scanner with AI4Privacy BERT model is ready.
-- **Response:**
-  - JSON object with service status and model information:
-    ```json
-    {
-      "status": "healthy",
-      "service": "anonymization",
-      "engines_initialized": true,
-      "recognizers": "LLM-Guard with AI4Privacy model (54 PII types)",
-      "model": "Isotonic/distilbert_finetuned_ai4privacy_v2"
-    }
-    ```
-  - Returns `"status": "unhealthy"` with error details if the service is not ready.
-
-### `/anonymization/pseudonymize` (POST)
-
-- **Description:** Pseudonymize text with consistent replacements designed for reversibility. Uses vault state for maintaining mappings across multiple documents.
-- **Request:**
-  ```json
-  {
-    "text": "Text to pseudonymize",
-    "config": {
-      "entity_types": ["PERSON", "EMAIL_ADDRESS", ...],
-      "date_shift_days": 365
-    },
-    "vault_data": [ /* Optional: Previous vault data */ ]
-  }
-  ```
-- **Response:**
-  ```json
-  {
-    "pseudonymized_text": "Text with consistent pseudonyms",
-    "statistics": { "PERSON": 2, ... },
-    "vault_data": [ /* Updated vault with all mappings */ ]
-  }
-  ```
-
-### `/anonymization/deanonymize` (POST)
-
-- **Description:** Reverse pseudonymization using vault mappings to restore original values.
-- **Request:**
-  ```json
-  {
-    "text": "Pseudonymized text",
-    "vault_data": [
-      /* Required: Vault data from pseudonymization */
-    ]
-  }
-  ```
-- **Response:**
-  ```json
-  {
-    "deanonymized_text": "Original text restored",
-    "statistics": { "PERSON": 2, ... }
-  }
-  ```
-
-## Element ID System
-
-The FastAPI backend implements a stable element identification system that enables tracking elements throughout the processing pipeline:
-
-### ID Generation Strategy
-
-Element IDs are generated during the extraction phase (`/extract`) and follow this format:
-
-- **Pattern**: `{element_type}_{page}_{global_index}_{content_hash}`
-- **Examples**:
-  - `para_1_0_a3f2b1` - First paragraph on page 1
-  - `table_5_2_d4e5f6` - Third table on page 5
-  - `cell_5_2_0_0_b7c8d9` - Cell at row 0, column 0 in the third table on page 5
-
-### ID Stability Through Pipeline
-
-```
-1. Extraction (/extract)
-   ├── Stitches batches from Azure DI
-   └── Adds _id to all elements
-
-2. Filtering (/segment-filtered)
-   ├── Removes unwanted fields based on preset
-   └── PRESERVES _id fields
-
-3. Segmentation
-   ├── Groups filtered elements into chunks
-   └── Elements keep their original _id
-
-4. LLM Processing
-   └── Can reference specific elements by _id
-```
-
-### Benefits
-
-- **Traceability**: Track any element from LLM output back to its exact location in the original document
-- **Stability**: IDs remain constant regardless of filtering or segmentation choices
-- **Debugging**: Easy to correlate elements across different processing stages
-- **Caching**: Can cache processed elements by ID for efficiency
-
-## Performance and Limits
-
-- **PDF Processing**:
-  - Maximum tested: 353+ pages with perfect reconstruction
-  - Default batch size: 1500 pages per Azure DI request
-  - Concurrent batch processing for optimal speed
-  - Sub-second execution for most operations
-- **Segmentation**:
-  - Token limits: Configurable 10k-30k tokens per segment
-  - Intelligent boundary detection at H1/H2 headings
-  - Minimal memory usage through streaming architecture
-- **Anonymization**:
-  - Sub-second processing for typical documents
-  - BERT model initialization: ~2-3 seconds on first request
-  - High accuracy for common PII types
-- **API Limits**:
-  - Request size: Limited by web server configuration (typically 100MB)
-  - Timeout: Default 120 seconds, configurable
-  - Concurrent requests: Handled by multiple workers (default: 4)
-
-## Anonymization Configuration Parameters
-
-The anonymization endpoints support the following configuration parameters:
-
-- **entity_types**: List of entity types to detect and anonymize
-  - Default: Basic types like `PERSON`, `DATE_TIME`, `LOCATION`, `PHONE_NUMBER`, `EMAIL_ADDRESS`, `US_SSN`, `MEDICAL_LICENSE`
-  - AI4Privacy model supports 54 PII types - leave empty to detect all
-  - Note: US_SSN detection requires valid SSN patterns (not test patterns like 123-45-6789)
-- **pattern_sets**: Enable predefined pattern sets (list of strings)
-  - `"legal"`: Bates numbers, case numbers, docket numbers, court filings
-  - `"medical"`: Medical record numbers, insurance IDs, provider numbers
-- **custom_patterns**: Define your own regex patterns (list of pattern objects)
-  - Each pattern needs: `name`, `expressions` (regex list)
-  - Optional: `examples`, `context`, `score`, `languages`
-- **score_threshold**: Minimum confidence score (0.0-1.0, default: 0.5)
-  - Higher values reduce false positives but may miss some entities
-  - Recommended range: 0.5-0.7
-- **anonymize_all_strings**: Anonymize all string fields (true) or only known PII fields (false) (default: true)
-- **date_shift_days**: Maximum days to shift dates for anonymization (default: 365)
-- **return_decision_process**: Include debugging information about detection reasoning (default: false) - Note: Not currently supported with LLM-Guard
-
-## Planned Features
-
-- **Custom Regex Pattern Support**: Allow users to define domain-specific entity patterns
-- **Multi-language Support**: Currently English-only, planning to add other languages
-- **Batch Processing**: Anonymize multiple documents in a single request
-
-## Example Workflow
-
-Here's a complete workflow showing how to process a sensitive PDF document:
-
-### 1. Extract PDF Content with Element IDs
-
-```bash
-# Extract structured data from PDF
-curl -X POST http://localhost:8000/extract \
-  -F "file=@confidential_document.pdf" \
-  -F "batch_size=1500" \
-  -F "include_element_ids=true" \
-  > extracted_result.json
-```
-
-### Alternative: Extract with Automatic Segmentation
-
-```bash
-# Extract and segment PDF for direct LLM processing
-curl -X POST http://localhost:8000/extract \
-  -F "file=@large_document.pdf" \
-  -F "enable_segmentation=true" \
-  -F "segment_min_tokens=10000" \
-  -F "segment_max_tokens=30000" \
-  > segmented_result.json
-
-# Result includes both full content and segments:
-# {
-#   "markdown_content": "Full document...",
-#   "json_content": { ... },
-#   "segments": [
-#     {
-#       "segment_id": 1,
-#       "token_count": 15234,
-#       "structural_context": { "h1": "Chapter 1", ... },
-#       "elements": [ ... ]
-#     }
-#   ]
-# }
-```
-
-### Alternative: Local Extraction with Chunking
-
-```bash
-# Extract and chunk locally for RAG applications
-curl -X POST http://localhost:8000/extract-local \
-  -F "file=@document.pdf" \
-  -F "enable_chunking=true" \
-  -F "chunk_min_tokens=1000" \
-  -F "chunk_max_tokens=3000" \
-  > chunked_result.json
-
-# Each chunk includes contextual hierarchy:
-# {
-#   "chunks": [{
-#     "text": "Chapter 1 > Section A\n\nActual content...",
-#     "token_count": 2543,
-#     "meta": { ... }
-#   }]
-# }
-```
-
-### 2. Filter and Segment for LLM Processing
-
-```bash
-# Prepare document for LLM with optimized token usage
-curl -X POST http://localhost:8000/segment-filtered \
-  -H "Content-Type: application/json" \
-  -d '{
-    "source_file": "confidential_document.pdf",
-    "json_content": '$(cat extracted_result.json | jq .json_content)',
-    "filter_config": {
-      "filter_preset": "llm_ready",
-      "include_element_ids": true
-    },
-    "min_segment_tokens": 10000,
-    "max_segment_tokens": 30000
-  }' \
-  > segmented_result.json
-```
-
-### 3. Anonymize Sensitive Content (Optional)
-
-```bash
-# Remove PII before sending to LLM
-curl -X POST http://localhost:8000/anonymization/anonymize-azure-di \
-  -H "Content-Type: application/json" \
-  -d '{
-    "azure_di_json": '$(cat extracted_result.json | jq .json_content)',
-    "config": {
-      "entity_types": ["PERSON", "EMAIL_ADDRESS", "PHONE_NUMBER", "US_SSN"],
-      "pattern_sets": ["legal", "medical"],  # Enable domain-specific patterns
-      "score_threshold": 0.6,
-      "anonymize_all_strings": true
-    }
-  }' \
-  > anonymized_result.json
-```
-
-#### Custom Pattern Example
-
-```bash
-# Anonymize with custom patterns
-curl -X POST http://localhost:8000/anonymization/anonymize-markdown \
-  -H "Content-Type: application/json" \
-  -d '{
-    "markdown_text": "Case No. 1:23-cv-45678 references BATES-001234",
-    "config": {
-      "pattern_sets": ["legal"],
-      "custom_patterns": [
-        {
-          "name": "INTERNAL_ID",
-          "expressions": ["\\bID-\\d{8}\\b"],
-          "examples": ["ID-12345678"]
-        }
-      ]
-    }
-  }'
-```
-
-### 4. Compose Prompt for LLM
-
-```bash
-# Create structured prompt with instructions
-curl -X POST http://localhost:8000/compose-prompt \
-  -F 'mapping={"instructions":"Summarize the key findings","document":"@segmented_result.json"}' \
-  -F "document=@segmented_result.json" \
-  > final_prompt.txt
-```
-
-## Error Handling
-
-### Common Errors and Solutions
-
-- **413 Request Entity Too Large**
-
-  - Solution: Reduce the `batch_size` parameter in `/extract`
-  - Default file size limit can be increased in server configuration
-
-- **Azure DI Timeout (504 Gateway Timeout)**
-
-  - Large PDFs may exceed Azure's processing time
-  - Solution: Use smaller batch sizes (e.g., 500-1000 pages)
-
-- **Memory Errors**
-
-  - For documents with many tables or complex layouts
-  - Solution: Process in smaller segments or increase server memory
-
-- **AI4Privacy Model Loading Errors**
-
-  - LLM-Guard will download the AI4Privacy model on first use
-  - Solution: Ensure internet connectivity for model download (~134MB)
-
-- **Invalid Azure Credentials**
-  - Check your `.env` file configuration
-  - Verify endpoint URL includes `https://` and trailing `/`
-
-### Debugging Tips
-
-1. Enable debug logging: Set `LOG_LEVEL=DEBUG` in `.env`
-2. Check element IDs for tracking issues through the pipeline
-3. Use `/anonymization/health` to verify service status
-4. Test with smaller documents first
-
-## Security Considerations
-
-### Data Protection
-
-- **Use HTTPS in Production**: Always deploy with TLS/SSL certificates
-- **Secure Credentials**:
-  - Store Azure keys in environment variables, never in code
-  - Use Azure Key Vault or similar for production deployments
-  - Rotate API keys regularly
-
-### Anonymization Best Practices
-
-- **One-Way Anonymization**: Mappings are not stored by default (future deanonymization support planned)
-- **Review Output**: Always verify anonymized content before sharing
-- **Session Isolation**: Each anonymization request uses isolated replacement mappings
-- **Score Threshold**: Adjust based on your security requirements (higher = fewer false positives)
-
-### Network Security
-
-- **API Authentication**: Consider adding authentication middleware for production
-- **Network Isolation**: Deploy in a private network for sensitive documents
-- **Rate Limiting**: Implement to prevent abuse
-- **CORS Configuration**: Restrict to trusted domains only
-
-### Compliance Notes
-
-- Azure Document Intelligence is HIPAA compliant with proper configuration
-- Anonymization helps meet GDPR/CCPA requirements
-- Audit logs should be implemented for forensic use cases
-- Consider data residency requirements for your jurisdiction
-
----
+**Built for AI** - ForensicAPI ensures your sensitive documents stay private while enabling powerful AI analysis.
