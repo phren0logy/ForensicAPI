@@ -42,7 +42,7 @@ def test_create_anonymizer_with_vault_data():
     ]
     
     config = AnonymizationConfig()
-    scanner, vault = create_anonymizer(config, vault_data)
+    scanner, vault, _ = create_anonymizer(config, vault_data)
     
     # Verify vault was initialized with data
     assert len(vault.get()) == 2

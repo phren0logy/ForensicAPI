@@ -10,13 +10,14 @@ This module tests the Azure DI extraction functionality including:
 
 import json
 import os
+import pytest
 from pathlib import Path
 from typing import Dict, Any
 
-import pytest
 from fastapi.testclient import TestClient
 
 from main import app
+
 from routes.extraction import add_ids_to_elements, generate_element_id
 
 
@@ -27,13 +28,12 @@ class TestElementIDGeneration:
         """Test that element IDs follow the expected format."""
         element_id = generate_element_id("para", 1, 0, "Sample content")
         
-        # Should be in format: {type}_{page}_{index}_{hash}
+        # Should be in format: {type}_{page}_{hash}
         parts = element_id.split("_")
-        assert len(parts) == 4
+        assert len(parts) == 3
         assert parts[0] == "para"
         assert parts[1] == "1"
-        assert parts[2] == "0"
-        assert len(parts[3]) == 6  # 6-character hash
+        assert len(parts[2]) == 8  # 8-character hash
     
     def test_generate_element_id_deterministic(self):
         """Test that same inputs generate same ID."""
@@ -51,7 +51,7 @@ class TestElementIDGeneration:
         """Test ID generation with empty content."""
         element_id = generate_element_id("fig", 3, 1, "")
         parts = element_id.split("_")
-        assert len(parts) == 4
+        assert len(parts) == 3
         assert parts[0] == "fig"
 
 
@@ -71,8 +71,8 @@ class TestAddIDsToElements:
         
         assert "_id" in result["paragraphs"][0]
         assert "_id" in result["paragraphs"][1]
-        assert result["paragraphs"][0]["_id"].startswith("para_1_0_")
-        assert result["paragraphs"][1]["_id"].startswith("para_2_1_")
+        assert result["paragraphs"][0]["_id"].startswith("para_1_")
+        assert result["paragraphs"][1]["_id"].startswith("para_2_")
     
     def test_add_ids_to_tables_and_cells(self):
         """Test adding IDs to tables and their cells."""
@@ -89,12 +89,12 @@ class TestAddIDsToElements:
         result = add_ids_to_elements(doc)
         
         assert "_id" in result["tables"][0]
-        assert result["tables"][0]["_id"].startswith("table_3_0_")
+        assert result["tables"][0]["_id"].startswith("table_3_")
         
         assert "_id" in result["tables"][0]["cells"][0]
         assert "_id" in result["tables"][0]["cells"][1]
-        assert result["tables"][0]["cells"][0]["_id"].startswith("cell_3_0_0_0_")
-        assert result["tables"][0]["cells"][1]["_id"].startswith("cell_3_0_0_1_")
+        assert result["tables"][0]["cells"][0]["_id"].startswith("cell_3_")
+        assert result["tables"][0]["cells"][1]["_id"].startswith("cell_3_")
     
     def test_add_ids_preserves_original_structure(self):
         """Test that adding IDs doesn't modify other fields."""

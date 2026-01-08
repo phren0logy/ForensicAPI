@@ -4,9 +4,9 @@ This is a tool to facilitate LLM experiments with PDFs, especially those that co
 
 This application provides an API that uses Azure Document Intelligence to convert PDFs to Markdown and structured JSON, handling PDFs of arbitrary size (rather than being limited to Azure's single-request limit of 2000 pages). The system preserves document structure through intelligent segmentation that maintains hierarchical heading context (H1-H6). Every JSON element is automatically assigned a unique ID for tracing back to the source document. The filtering endpoint facilitates stripping out unnecessary JSON components to optimize for LLM token usage.
 
-Additionally, the application offers local document processing through Docling, enabling privacy-sensitive operations without external API calls. This includes intelligent document chunking for RAG applications, with semantic segmentation that respects document structure and maintains hierarchical context within each chunk.
+Docling conversion is handled by a separate docling-serve instance. Use docling-serve for conversion, then pass its outputs into this API’s post-processing endpoints (segmentation, filtering, anonymization, prompt composition, etc.).
 
-There is also an endpoint to anonymize documents using LLM-Guard with the AI4Privacy BERT model for comprehensive PII detection (54 entity types with 97.8% F1 score), as well as an endpoint to compose prompts around large documents with instructions and the beginning and the end (as recommended by the GPT-4.1 documentation).
+There is also an endpoint to anonymize documents using LLM-Guard with the AI4Privacy BERT model for comprehensive PII detection (supported entity list depends on your LLM-Guard version), as well as an endpoint to compose prompts around large documents with instructions and the beginning and the end (as recommended by the GPT-4.1 documentation).
 
 ## Test the Endpoints
 
@@ -43,7 +43,7 @@ FastAPI provides automatic interactive API documentation:
 
 ### Prerequisites
 
-- Python 3.13+
+- Python 3.13.x (3.14 is not supported yet due to spaCy/pydantic compatibility)
 - Azure Document Intelligence account and credentials
 - Install dependencies using [uv](https://github.com/astral-sh/uv):
   ```sh
@@ -68,8 +68,8 @@ LOG_LEVEL=INFO
 ### Key Dependencies
 
 - **[Azure Document Intelligence](https://azure.microsoft.com/en-us/products/ai-services/ai-document-intelligence/)**: Enterprise-grade PDF to structured data extraction
-- **[Docling](https://github.com/DS4SD/docling)**: Local document processing with intelligent chunking and OCR support
-- **[LLM-Guard](https://llm-guard.com/)**: Advanced PII detection and anonymization with AI4Privacy BERT model (54 PII types)
+- **[Docling-serve](https://github.com/docling-project/docling-serve)**: External document conversion service (run separately)
+- **[LLM-Guard](https://llm-guard.com/)**: Advanced PII detection and anonymization with the AI4Privacy BERT model (supported entity list depends on your LLM-Guard version)
 - **[FastAPI](https://fastapi.tiangolo.com/)**: Modern, fast web framework with automatic API documentation
 - **[UV](https://github.com/astral-sh/uv)**: Ultra-fast Python package and project management
 - **Python 3.13+**: Required for latest performance improvements and type hints
@@ -224,96 +224,32 @@ uv run run.py
   - When `return_both=true`: Returns both `json_content` (with IDs) and `json_content_original` (without IDs)
   - When `enable_segmentation=true`: Includes `segments` array with document broken into semantically meaningful chunks
 
-### `/extract-local` (POST)
+### Docling-serve (external)
 
-- **Description:** Extracts structured data and markdown from documents locally using Docling, without requiring external API calls. Supports intelligent document chunking for RAG pipelines and LLM applications. Processes PDFs, DOCX, PPTX, HTML, and MD files with optional OCR support.
+Docling conversion is performed directly via docling-serve’s API (for example: `/v1/convert/file` or `/v1/convert/source`). This service expects standard docling-serve responses (with `document.md_content` and `document.json_content`) and provides downstream post-processing endpoints for those outputs.
+
+### `/segment-docling` (POST)
+
+- **Description:** Chunks a docling-serve response into rich segments using docling-core chunking.
 - **Request:**
-  - `multipart/form-data` with the following fields:
-    - `file`: Document file to process (required)
-    - `ocr_enabled`: Enable OCR for scanned content (optional, default: true)
-    - `ocr_lang`: OCR language code (optional, default: "en")
-    - `max_pages`: Maximum number of pages to process (optional)
-    - `enable_chunking`: Enable intelligent document chunking (optional, default: false)
-    - `chunk_min_tokens`: Minimum tokens per chunk (optional, default: 1000)
-    - `chunk_max_tokens`: Maximum tokens per chunk (optional, default: 30000)
-    - `merge_peers`: Merge sibling elements when possible (optional, default: true)
-- **Features:**
-  - **Local Processing**: No data sent to external services, ensuring complete privacy
-  - **OCR Support**:
-    - macOS: Uses native Vision framework via ocrmac (fast, accurate)
-    - Other platforms: Falls back to EasyOCR
-  - **Intelligent Chunking** (when enabled):
-    - Semantic segmentation respecting document structure (headings, paragraphs, tables)
-    - Token-based size control using tiktoken with GPT-4's cl100k_base encoding
-    - Hierarchical context preservation in each chunk
-    - Rich metadata including source references and page locations
-  - **Format Support**: PDF, DOCX, DOC, PPTX, HTML, MD
-  - **No Page Limits**: Processes complete documents without Azure's 2000-page restriction
-- **Response:**
-  - A JSON object containing:
+  - A JSON object with the following structure:
     ```json
     {
-      "markdown_content": "Complete document in markdown format",
-      "json_content": {
-        // Native Docling document structure
-      },
-      "chunks": [
-        // Only present when chunking is enabled
-        {
-          "text": "Section 1 > Subsection 1.1\n\nThe actual chunk content with context...",
-          "token_count": 1250,
-          "meta": {
-            "doc_items": [
-              {
-                "self_ref": "#/texts/28",
-                "label": "text",
-                "prov": [
-                  {
-                    "page_no": 2,
-                    "bbox": {
-                      "l": 53.29,
-                      "t": 287.14,
-                      "r": 295.56,
-                      "b": 212.37
-                    }
-                  }
-                ]
-              }
-            ],
-            "headings": ["Section 1", "Subsection 1.1"],
-            "origin": {
-              "filename": "document.pdf"
-            }
-          }
-        }
-        // ... more chunks
-      ],
-      "metadata": {
-        "page_count": 10,
-        "processing_type": "docling",
-        "processing_time": 2.5,
-        "file_size": 1048576,
-        "filename": "document.pdf",
-        "ocr_applied": false,
-        "ocr_enabled": true,
-        "ocr_platform": "ocrmac",
-        // Chunking metadata (when enabled)
-        "chunk_count": 15,
-        "chunking_enabled": true,
-        "chunk_config": {
-          "min_tokens": 1000,
-          "max_tokens": 30000,
-          "tokenizer": "tiktoken-cl100k_base",
-          "merge_peers": true
-        }
-      }
+      "source_file": "document.pdf",
+      "docling_response": { "... full docling-serve response ..." },
+      "min_segment_tokens": 1000,
+      "max_segment_tokens": 30000,
+      "merge_peers": true
     }
     ```
-- **Chunking Use Cases:**
-  - **RAG Applications**: Create optimal chunks for vector database ingestion
-  - **LLM Context Windows**: Ensure chunks fit within model token limits
-  - **Semantic Search**: Maintain document structure for better retrieval
-  - **Document Q&A**: Preserve section hierarchy for contextual understanding
+  - **Parameters:**
+    - `source_file`: Name of the original document (required)
+    - `docling_response`: Full docling-serve response (required)
+    - `min_segment_tokens`: Minimum tokens per segment (optional, default: 1,000)
+    - `max_segment_tokens`: Maximum tokens per segment (optional, default: 30,000)
+    - `merge_peers`: Merge adjacent peers when chunking (optional, default: true)
+- **Response:**
+  - A JSON array of "Rich Segment" objects (same schema as `/segment`).
 
 ### `/segment` (POST)
 
@@ -533,7 +469,7 @@ uv run run.py
     ```
 - **Features:**
   - Uses LLM-Guard with AI4Privacy BERT model (Isotonic/distilbert_finetuned_ai4privacy_v2)
-  - Detects 54 different PII types with 97.8% F1 score
+  - Broad PII coverage with strong F1 score (see LLM-Guard/AI4Privacy model documentation)
   - Advanced pattern recognition beyond basic NER
   - Configurable confidence threshold to reduce false positives
   - Realistic fake data generation using Faker library
@@ -542,14 +478,8 @@ uv run run.py
   - Preserves document structure and element IDs
   - Optional decision process debugging
 - **Supported Entity Types:**
-  - All 54 PII types from AI4Privacy model including:
-    - Personal: Names, ages, gender, occupation, education
-    - Financial: Bank accounts, credit cards, IBANs
-    - Contact: Emails, phones, addresses, URLs
-    - Technical: IP addresses, crypto wallets, API keys
-    - Medical: Diagnoses, medications, conditions
-    - Legal: Case numbers, court names
-  - Note: You can specify a subset of entity types in the config
+  - Use `entity_types` to constrain detection to specific types.
+  - Use `["all"]` to include all entity types supported by the installed LLM-Guard configuration.
 - **Response:**
   - JSON object containing:
     ```json
@@ -610,7 +540,7 @@ uv run run.py
       "status": "healthy",
       "service": "anonymization",
       "engines_initialized": true,
-      "recognizers": "LLM-Guard with AI4Privacy model (54 PII types)",
+      "recognizers": "LLM-Guard with AI4Privacy model (supported entity list depends on version)",
       "model": "Isotonic/distilbert_finetuned_ai4privacy_v2"
     }
     ```
@@ -725,7 +655,8 @@ The anonymization endpoints support the following configuration parameters:
 
 - **entity_types**: List of entity types to detect and anonymize
   - Default: Basic types like `PERSON`, `DATE_TIME`, `LOCATION`, `PHONE_NUMBER`, `EMAIL_ADDRESS`, `US_SSN`, `MEDICAL_LICENSE`
-  - AI4Privacy model supports 54 PII types - leave empty to detect all
+  - Use `null` or `[]` to use the default list
+  - Use `["all"]` to include all entity types supported by the installed LLM-Guard configuration
   - Note: US_SSN detection requires valid SSN patterns (not test patterns like 123-45-6789)
 - **pattern_sets**: Enable predefined pattern sets (list of strings)
   - `"legal"`: Bates numbers, case numbers, docket numbers, court filings
@@ -787,25 +718,17 @@ curl -X POST http://localhost:8000/extract \
 # }
 ```
 
-### Alternative: Local Extraction with Chunking
+### Alternative: Local Extraction via docling-serve
+
+Docling conversion should be performed directly against docling-serve (not this API):
 
 ```bash
-# Extract and chunk locally for RAG applications
-curl -X POST http://localhost:8000/extract-local \
-  -F "file=@document.pdf" \
-  -F "enable_chunking=true" \
-  -F "chunk_min_tokens=1000" \
-  -F "chunk_max_tokens=3000" \
-  > chunked_result.json
-
-# Each chunk includes contextual hierarchy:
-# {
-#   "chunks": [{
-#     "text": "Chapter 1 > Section A\n\nActual content...",
-#     "token_count": 2543,
-#     "meta": { ... }
-#   }]
-# }
+curl -X POST http://localhost:5001/v1/convert/file \
+  -F "files=@document.pdf" \
+  -F "to_formats=md" \
+  -F "to_formats=json" \
+  -F "do_ocr=true" \
+  > docling_result.json
 ```
 
 ### 2. Filter and Segment for LLM Processing

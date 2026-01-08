@@ -46,6 +46,13 @@ class FilteredSegmentationInput(BaseModel):
     min_segment_tokens: int = 10000  # Configurable with reasonable default
     max_segment_tokens: int = 30000  # Configurable with reasonable default
 
+class DoclingSegmentationInput(BaseModel):
+    source_file: str
+    docling_response: Dict[str, Any]
+    min_segment_tokens: int = 1000
+    max_segment_tokens: int = 30000
+    merge_peers: bool = True
+
 class FilteredSegment(BaseModel):
     segment_id: int
     source_file: str
@@ -146,6 +153,40 @@ def create_rich_segments(
     segments: List[RichSegment] = []
     current_context = StructuralContext()
     
+    def get_element_text(element: Dict[str, Any]) -> str:
+        """Best-effort extraction of textual content from Azure DI elements."""
+        content = element.get("content")
+        if isinstance(content, str) and content.strip():
+            return content
+        value = element.get("value")
+        if isinstance(value, str) and value.strip():
+            return value
+        if isinstance(element.get("key"), dict) or isinstance(element.get("value"), dict):
+            key_content = element.get("key", {}).get("content", "")
+            value_content = element.get("value", {}).get("content", "")
+            combined = f"{key_content}: {value_content}".strip(": ").strip()
+            if combined:
+                return combined
+        if isinstance(element.get("cells"), list):
+            cell_text = " ".join(
+                cell.get("content", "") for cell in element["cells"] if isinstance(cell, dict)
+            ).strip()
+            if cell_text:
+                return cell_text
+        if isinstance(element.get("lines"), list):
+            line_text = " ".join(
+                line.get("content", "") for line in element["lines"] if isinstance(line, dict)
+            ).strip()
+            if line_text:
+                return line_text
+        if isinstance(element.get("words"), list):
+            word_text = " ".join(
+                word.get("content", "") for word in element["words"] if isinstance(word, dict)
+            ).strip()
+            if word_text:
+                return word_text
+        return ""
+
     # Supported Azure DI element types - expanded from just paragraphs + tables
     SUPPORTED_ELEMENT_TYPES = ["paragraphs", "tables", "figures", "formulas", "keyValuePairs"]
     
@@ -161,6 +202,25 @@ def create_rich_segments(
                 if "content" not in element:
                     logger.warning(f"Element {i} in {element_type} missing 'content' field")
             all_elements.extend(elements)
+
+    if not all_elements:
+        pages = analysis_result.get("pages", [])
+        for page in pages:
+            page_number = page.get("pageNumber", 0)
+            page_lines = page.get("lines") or []
+            page_words = page.get("words") or []
+            if page_lines:
+                for line in page_lines:
+                    if isinstance(line, dict):
+                        line["pageNumber"] = page_number
+                        line.setdefault("role", "line")
+                        all_elements.append(line)
+            elif page_words:
+                for word in page_words:
+                    if isinstance(word, dict):
+                        word["pageNumber"] = page_number
+                        word.setdefault("role", "word")
+                        all_elements.append(word)
     
     # Sort by span offset to maintain document order, handling different span structures
     def get_element_offset(element):
@@ -193,7 +253,9 @@ def create_rich_segments(
 
     for element in all_elements:
         try:
-            element_content = element.get("content", "")
+            element_content = get_element_text(element)
+            if not element_content:
+                continue
             element_tokens = len(encoding.encode(element_content))
             element_role = element.get("role", "paragraph") # Default role
             
@@ -241,6 +303,110 @@ def create_rich_segments(
         ))
 
     logger.info(f"Created {len(segments)} segments from {len(all_elements)} elements")
+    return segments
+
+
+def _extract_docling_document(docling_response: Dict[str, Any]) -> Dict[str, Any]:
+    if not isinstance(docling_response, dict):
+        raise HTTPException(status_code=400, detail="docling_response must be an object")
+    document = docling_response.get("document")
+    if not isinstance(document, dict):
+        raise HTTPException(status_code=400, detail="docling_response.document is required")
+    json_content = document.get("json_content")
+    if not isinstance(json_content, dict):
+        raise HTTPException(status_code=400, detail="docling_response.document.json_content must be an object")
+    return json_content
+
+
+def _chunk_docling_document(
+    docling_json: Dict[str, Any],
+    source_file: str,
+    min_segment_tokens: int,
+    max_segment_tokens: int,
+    merge_peers: bool,
+) -> List[Dict[str, Any]]:
+    try:
+        from docling_core.transforms.chunker.hybrid_chunker import HybridChunker
+        from docling_core.transforms.chunker.tokenizer.openai import OpenAITokenizer
+        try:
+            from docling_core.types.doc import DoclingDocument
+        except Exception:
+            from docling_core.types import Document as DoclingDocument
+    except Exception as exc:  # pragma: no cover - import guard
+        raise HTTPException(
+            status_code=500,
+            detail=f"Docling chunking dependencies are not available: {exc}",
+        )
+
+    try:
+        if hasattr(DoclingDocument, "model_validate"):
+            docling_doc = DoclingDocument.model_validate(docling_json)
+        else:
+            docling_doc = DoclingDocument.parse_obj(docling_json)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Invalid docling document: {exc}")
+
+    tokenizer = OpenAITokenizer(
+        tokenizer=encoding,
+        max_tokens=max_segment_tokens,
+    )
+    chunker = HybridChunker(tokenizer=tokenizer, merge_peers=merge_peers)
+
+    segments: List[Dict[str, Any]] = []
+    segment_id = 1
+
+    for chunk in chunker.chunk(docling_doc):
+        raw_text = getattr(chunk, "text", "")
+        contextualized = raw_text
+        contextualize = getattr(chunker, "contextualize", None)
+        if callable(contextualize):
+            try:
+                contextualized = contextualize(chunk)
+            except Exception:
+                contextualized = raw_text
+
+        token_count = len(encoding.encode(contextualized))
+
+        element: Dict[str, Any] = {
+            "content": contextualized,
+            "role": "chunk",
+        }
+
+        if raw_text and raw_text != contextualized:
+            element["raw_content"] = raw_text
+
+        meta = getattr(chunk, "meta", None)
+        if meta is not None:
+            export = getattr(meta, "export_json_dict", None)
+            if callable(export):
+                element["docling_meta"] = export()
+
+        segments.append({
+            "segment_id": segment_id,
+            "source_file": source_file,
+            "token_count": token_count,
+            "structural_context": StructuralContext().model_dump(),
+            "elements": [element],
+        })
+        segment_id += 1
+
+    if min_segment_tokens > 0 and segments:
+        merged: List[Dict[str, Any]] = []
+        buffer = segments[0]
+        for segment in segments[1:]:
+            if buffer["token_count"] < min_segment_tokens:
+                buffer["elements"].extend(segment["elements"])
+                buffer["token_count"] += segment["token_count"]
+            else:
+                merged.append(buffer)
+                buffer = segment
+        if buffer:
+            merged.append(buffer)
+
+        for idx, segment in enumerate(merged, start=1):
+            segment["segment_id"] = idx
+        segments = merged
+
     return segments
 
 def create_filtered_segments(
@@ -511,4 +677,34 @@ async def segment_with_filtering(payload: FilteredSegmentationInput = Body(...))
     except Exception as e:
         error_msg = f"Error during filtered segmentation of {payload.source_file}: {str(e)}"
         logger.error(error_msg, exc_info=True)
-        raise HTTPException(status_code=500, detail=error_msg) 
+        raise HTTPException(status_code=500, detail=error_msg)
+
+
+@router.post("/segment-docling", response_model=List[RichSegment])
+async def segment_docling(payload: DoclingSegmentationInput = Body(...)):
+    """
+    Segment a docling-serve response into rich, structurally-aware chunks.
+
+    **Input:**
+    - `source_file`: Name of the original document
+    - `docling_response`: Full docling-serve response with `document.json_content`
+    - `min_segment_tokens`: Minimum tokens per segment (default: 1,000)
+    - `max_segment_tokens`: Maximum tokens per segment (default: 30,000)
+    - `merge_peers`: Merge adjacent peers when chunking (default: true)
+    """
+    if payload.min_segment_tokens <= 0:
+        raise HTTPException(status_code=400, detail="min_segment_tokens must be positive")
+    if payload.max_segment_tokens <= 0:
+        raise HTTPException(status_code=400, detail="max_segment_tokens must be positive")
+    if payload.min_segment_tokens >= payload.max_segment_tokens:
+        raise HTTPException(status_code=400, detail="min_segment_tokens must be less than max_segment_tokens")
+
+    docling_json = _extract_docling_document(payload.docling_response)
+    segments = _chunk_docling_document(
+        docling_json=docling_json,
+        source_file=payload.source_file,
+        min_segment_tokens=payload.min_segment_tokens,
+        max_segment_tokens=payload.max_segment_tokens,
+        merge_peers=payload.merge_peers,
+    )
+    return segments

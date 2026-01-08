@@ -376,12 +376,12 @@ class TestExtractElements:
         
         elements = extract_elements_from_azure_di(azure_di_result)
         
-        # Should have 2 words + 1 line + 1 table = 4 elements
-        assert len(elements) == 4
-        assert elements[0]["elementType"] == "word"
-        assert elements[2]["elementType"] == "line"
-        assert elements[3]["elementType"] == "table"
-        assert elements[3]["pageNumber"] == 3
+        # When lines are present, words are skipped to avoid duplication
+        # Should have 1 line + 1 table = 2 elements
+        assert len(elements) == 2
+        assert elements[0]["elementType"] == "line"
+        assert elements[1]["elementType"] == "table"
+        assert elements[1]["pageNumber"] == 3
 
 
 class TestApplyFilters:
@@ -595,7 +595,7 @@ class TestFilteredSegmentationEndpoint:
         """Test basic filtered segmentation."""
         payload = {
             "source_file": "test_document.pdf",
-            "analysis_result": sample_azure_di_result,
+            "json_content": sample_azure_di_result,
             "filter_config": {
                 "filter_preset": "minimal",
                 "include_element_ids": True
@@ -639,7 +639,7 @@ class TestFilteredSegmentationEndpoint:
         for preset in presets:
             payload = {
                 "source_file": "test_document.pdf",
-                "analysis_result": sample_azure_di_result,
+                "json_content": sample_azure_di_result,
                 "filter_config": {
                     "filter_preset": preset,
                     "include_element_ids": True
@@ -666,7 +666,7 @@ class TestFilteredSegmentationEndpoint:
         # Test with invalid token ranges
         payload = {
             "source_file": "test.pdf",
-            "analysis_result": {"pages": []},
+            "json_content": {"pages": []},
             "filter_config": {"filter_preset": "minimal"},
             "min_segment_tokens": 5000,
             "max_segment_tokens": 1000  # Max less than min
@@ -686,7 +686,7 @@ class TestFilteredSegmentationEndpoint:
         """Test that element mappings are properly organized by segment."""
         payload = {
             "source_file": "test_document.pdf",
-            "analysis_result": sample_azure_di_result,
+            "json_content": sample_azure_di_result,
             "filter_config": {
                 "filter_preset": "minimal",
                 "include_element_ids": True

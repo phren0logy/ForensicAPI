@@ -3,7 +3,7 @@ name = "2025-06-13-fastapi-reusable"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.13,<3.14"
 dependencies = [
     "aiohttp>=3.12.13",
     "azure-ai-documentintelligence>=1.0.2",
@@ -24,8 +24,6 @@ dependencies = [
     "pip>=25.1.1",
     "python-dateutil>=2.9.0.post0",
     "llm-guard>=0.3.16",
-    "docling>=2.39.0",
-    "ocrmac>=1.0.0",
     "docling-core[chunking-openai]>=2.39.0",
 ]
 

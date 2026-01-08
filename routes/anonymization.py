@@ -7,7 +7,7 @@ Implements security-focused design with random data generation and session isola
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Sequence
 import json
 from datetime import timedelta
 import random
@@ -15,6 +15,7 @@ import secrets
 from dateutil import parser as date_parser
 
 from llm_guard.input_scanners import Anonymize
+from llm_guard.input_scanners.anonymize import DEFAULT_ENTITY_TYPES as LLM_GUARD_DEFAULT_ENTITY_TYPES
 from llm_guard.input_scanners.anonymize_helpers import DISTILBERT_AI4PRIVACY_v2_CONF
 from llm_guard.vault import Vault
 
@@ -34,19 +35,93 @@ router = APIRouter(tags=["anonymization"])
 fake = Faker()  # Uses random seed for unpredictable anonymization
 
 # Default entity types for PII detection
-# LLM-Guard AI4Privacy supports 54 PII types - we can specify a subset or use all
+# This is the curated set used when entity_types is omitted or empty.
 DEFAULT_ENTITY_TYPES = [
     "PERSON", "DATE_TIME", "LOCATION", "PHONE_NUMBER", 
     "EMAIL_ADDRESS", "US_SSN", "MEDICAL_LICENSE"
 ]
 
+ALL_ENTITY_TYPE_SENTINELS = {"all", "*"}
+REGEX_ENTITY_COMPANIONS = {
+    "US_SSN": "US_SSN_RE",
+    "EMAIL_ADDRESS": "EMAIL_ADDRESS_RE",
+    "CREDIT_CARD": "CREDIT_CARD_RE",
+}
+
+
+def _extract_entity_types(entity_source: object) -> Optional[List[str]]:
+    """Try to extract entity type names from an AI4Privacy config object."""
+    candidates: Sequence[object] = []
+    if isinstance(entity_source, dict):
+        for key in ("entities", "labels", "entity_types", "classes", "supported_entities"):
+            if key in entity_source:
+                candidates = [entity_source[key]]
+                break
+    else:
+        for attr_name in ("entities", "labels", "entity_types", "classes", "supported_entities"):
+            if hasattr(entity_source, attr_name):
+                candidates = [getattr(entity_source, attr_name)]
+                break
+
+    if not candidates:
+        return None
+
+    raw = candidates[0]
+    if isinstance(raw, dict):
+        raw_values = list(raw.keys())
+    elif isinstance(raw, (list, tuple, set)):
+        raw_values = list(raw)
+    else:
+        raw_values = [raw]
+
+    entity_types = [value for value in raw_values if isinstance(value, str)]
+    return entity_types or None
+
+
+def get_ai4privacy_entity_types() -> Optional[List[str]]:
+    """Return all AI4Privacy entity types if available, otherwise None."""
+    return _extract_entity_types(DISTILBERT_AI4PRIVACY_v2_CONF)
+
+
+def get_all_supported_entity_types() -> List[str]:
+    """Return the full set of entity types supported by LLM-Guard in this install."""
+    entity_types: set[str] = set(LLM_GUARD_DEFAULT_ENTITY_TYPES)
+    if isinstance(DISTILBERT_AI4PRIVACY_v2_CONF, dict):
+        entity_types.update(
+            [e for e in DISTILBERT_AI4PRIVACY_v2_CONF.get("PRESIDIO_SUPPORTED_ENTITIES", []) if isinstance(e, str)]
+        )
+        mapping = DISTILBERT_AI4PRIVACY_v2_CONF.get("MODEL_TO_PRESIDIO_MAPPING", {})
+        if isinstance(mapping, dict):
+            entity_types.update([v for v in mapping.values() if isinstance(v, str)])
+    entity_types.discard("O")
+    return sorted(entity_types)
+
+
+def _normalize_entity_type(entity_type: str) -> str:
+    """Normalize entity types for statistics reporting."""
+    if entity_type.endswith("_RE"):
+        base = entity_type[:-3]
+        if base in REGEX_ENTITY_COMPANIONS:
+            return base
+    return entity_type
+
+
+def _expand_entity_types(entity_types: List[str]) -> List[str]:
+    """Add regex companion types for selected entities."""
+    expanded = list(entity_types)
+    for entity_type in entity_types:
+        companion = REGEX_ENTITY_COMPANIONS.get(entity_type)
+        if companion and companion not in expanded:
+            expanded.append(companion)
+    return expanded
+
 
 class AnonymizationConfig(BaseModel):
     """Configuration for anonymization process."""
     anonymize_all_strings: bool = Field(default=True, description="Anonymize all string fields (True) or only known PII fields (False)")
-    entity_types: List[str] = Field(
+    entity_types: Optional[List[str]] = Field(
         default_factory=lambda: DEFAULT_ENTITY_TYPES.copy(),
-        description="Entity types to anonymize"
+        description="Entity types to anonymize (null or [] = default set; use ['all'] for all supported types)"
     )
     date_shift_days: int = Field(default=365, description="Maximum days to shift dates")
     # Note: consistent_replacements is now always True for better security and user experience
@@ -174,35 +249,32 @@ def create_anonymizer(config: AnonymizationConfig, vault_data: Optional[List[Lis
     vault, date_offset = deserialize_vault(vault_data)
     
     try:
-        # Default entity types used by LLM-Guard when entity_types is None
-        DEFAULT_LLM_GUARD_ENTITIES = [
-            'CREDIT_CARD', 'CRYPTO', 'EMAIL_ADDRESS', 'IBAN_CODE', 
-            'IP_ADDRESS', 'PERSON', 'PHONE_NUMBER', 'US_SSN', 
-            'US_BANK_NUMBER', 'CREDIT_CARD_RE', 'UUID', 
-            'EMAIL_ADDRESS_RE', 'US_SSN_RE'
-        ]
-        
         # Get custom patterns if specified
         regex_patterns = None
-        all_entity_types = config.entity_types
-        
+        base_entity_types: List[str]
+        entity_types = config.entity_types or []
+        use_all_supported = any(
+            isinstance(entity, str) and entity.lower() in ALL_ENTITY_TYPE_SENTINELS
+            for entity in entity_types
+        )
+        if use_all_supported:
+            base_entity_types = get_all_supported_entity_types()
+        elif not entity_types:
+            base_entity_types = DEFAULT_ENTITY_TYPES.copy()
+        else:
+            base_entity_types = [entity for entity in entity_types if isinstance(entity, str)]
+
+        base_entity_types = _expand_entity_types(base_entity_types)
+
         if config.pattern_sets or config.custom_patterns:
             builtin_patterns = get_patterns_by_sets(config.pattern_sets)
             regex_patterns = merge_custom_patterns(builtin_patterns, config.custom_patterns)
-            
+
             # Extract custom entity types from patterns
             custom_entity_types = [p["name"] for p in regex_patterns]
-            
-            # Handle entity types configuration
-            if config.entity_types is None:
-                # If None, we want to use defaults + custom
-                all_entity_types = DEFAULT_LLM_GUARD_ENTITIES + custom_entity_types
-            elif len(config.entity_types) == 0:
-                # If empty list, user wants ONLY custom patterns
-                all_entity_types = custom_entity_types
-            else:
-                # If specific types listed, merge with custom types
-                all_entity_types = list(set(config.entity_types + custom_entity_types))
+            all_entity_types = list(dict.fromkeys(base_entity_types + custom_entity_types))
+        else:
+            all_entity_types = base_entity_types
         
         # Use AI4Privacy model with 54 PII types + custom patterns
         scanner = Anonymize(
@@ -222,8 +294,6 @@ def create_anonymizer(config: AnonymizationConfig, vault_data: Optional[List[Lis
                 logger.debug(f"  - Pattern: {pattern['name']} with expressions: {pattern['expressions']}")
         if all_entity_types:
             logger.info(f"✅ Using entity types: {all_entity_types}")
-        else:
-            logger.info("✅ Using all default entity types + custom patterns")
         return scanner, vault, date_offset
         
     except Exception as e:
@@ -447,7 +517,7 @@ def deanonymize_text_with_vault(text: str, vault_data: List[List[str]]) -> tuple
                 # Extract entity type from pattern like [REDACTED_BATES_NUMBER_1]
                 parts = placeholder[10:-1].rsplit('_', 1)  # Remove [REDACTED_ and ], split from right
                 if len(parts) == 2 and parts[1].isdigit():
-                    entity_type = parts[0]
+                    entity_type = _normalize_entity_type(parts[0])
                 else:
                     entity_type = 'OTHER'
             elif '@' in placeholder:
@@ -485,7 +555,7 @@ def extract_statistics_from_vault(vault: Vault) -> Dict[str, int]:
             # Extract entity type from pattern like [REDACTED_BATES_NUMBER_1]
             parts = replacement[10:-1].rsplit('_', 1)  # Remove [REDACTED_ and ], split from right
             if len(parts) == 2 and parts[1].isdigit():
-                entity_type = parts[0]
+                entity_type = _normalize_entity_type(parts[0])
             else:
                 entity_type = 'OTHER'
         # Infer standard entity types from replacement pattern

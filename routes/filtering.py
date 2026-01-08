@@ -12,6 +12,8 @@ import hashlib
 import json
 from fastapi import APIRouter
 
+from utils import generate_stable_element_id
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/filter", tags=["filtering"])
@@ -119,6 +121,26 @@ def filter_element(
     
     # Extract element ID from input (should already have _id from extraction phase)
     element_id = element.get("_id", element.get("id"))
+    if not element_id and config.include_element_ids:
+        element_type = element.get("elementType", element.get("role", element.get("type", "element")))
+        page_number = element.get("pageNumber", element.get("page_number", 0))
+        span_offset = None
+        span_length = None
+        if element.get("spans"):
+            span_offset = element["spans"][0].get("offset")
+            span_length = element["spans"][0].get("length")
+        bbox = None
+        if element.get("boundingRegions"):
+            bbox = element["boundingRegions"][0].get("polygon")
+        element_id = generate_stable_element_id(
+            element_type,
+            page_number,
+            content=content[:200],
+            span_offset=span_offset,
+            span_length=span_length,
+            bbox=bbox,
+            index=index,
+        )
     
     # Start with empty filtered data
     filtered_data = {}
@@ -177,7 +199,14 @@ def filter_element(
 def extract_elements_from_azure_di(analysis_result: Dict[str, Any]) -> List[Dict[str, Any]]:
     """Extract all elements from Azure DI result in reading order."""
     elements = []
-    
+
+    doc_level_types = {
+        element_type
+        for element_type in ["paragraphs", "tables", "figures", "lists", "keyValuePairs", "formulas"]
+        if analysis_result.get(element_type)
+    }
+    has_doc_paragraphs = "paragraphs" in doc_level_types
+
     # Process pages in order
     pages = analysis_result.get("pages", [])
     for page in pages:
@@ -185,6 +214,12 @@ def extract_elements_from_azure_di(analysis_result: Dict[str, Any]) -> List[Dict
         
         # Add page elements with page number
         for element_type in ["words", "lines", "paragraphs", "tables", "figures", "formulas"]:
+            if element_type in doc_level_types:
+                continue
+            if element_type in {"words", "lines", "paragraphs"} and has_doc_paragraphs:
+                continue
+            if element_type == "words" and page.get("lines"):
+                continue
             page_elements = page.get(element_type, [])
             for elem in page_elements:
                 elem["pageNumber"] = page_number
@@ -257,25 +292,26 @@ def apply_filters(
         # Filter the element
         filtered_elem, elem_id = filter_element(element, config, idx, parent_section)
         
-        if filtered_elem and elem_id:
+        if filtered_elem:
             filtered_index = len(filtered_elements)
             filtered_elements.append(filtered_elem)
-            
-            # Get content for hash - handle both dict and FilteredElement
-            if isinstance(filtered_elem, dict):
-                content = filtered_elem.get("content", "")
-            else:
-                content = filtered_elem.content
-            
-            # Create mapping
-            mapping = ElementMapping(
-                filtered_index=filtered_index,
-                azure_element_id=elem_id,
-                element_type=element.get("role", element.get("type", "unknown")),
-                page_number=element.get("pageNumber", 0),
-                content_hash=hashlib.md5(content.encode()).hexdigest()
-            )
-            element_mappings.append(mapping)
+
+            if elem_id:
+                # Get content for hash - handle both dict and FilteredElement
+                if isinstance(filtered_elem, dict):
+                    content = filtered_elem.get("content", "")
+                else:
+                    content = filtered_elem.content
+
+                # Create mapping
+                mapping = ElementMapping(
+                    filtered_index=filtered_index,
+                    azure_element_id=elem_id,
+                    element_type=element.get("role", element.get("type", "unknown")),
+                    page_number=element.get("pageNumber", 0),
+                    content_hash=hashlib.md5(content.encode()).hexdigest()
+                )
+                element_mappings.append(mapping)
         
         # Track excluded fields (fields in original but not in filtered)
         if filtered_elem:

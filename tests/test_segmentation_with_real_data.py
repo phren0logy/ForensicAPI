@@ -92,7 +92,7 @@ class TestRealDataSegmentation:
             
             payload = {
                 "source_file": f"{filename}.pdf",
-                "analysis_result": azure_di_json,
+                "json_content": azure_di_json,
                 "min_segment_tokens": 2000,
                 "max_segment_tokens": 6000
             }
@@ -138,7 +138,7 @@ class TestRealDataSegmentation:
                 
                 payload = {
                     "source_file": f"{filename}.pdf",
-                    "analysis_result": azure_di_json,
+                    "json_content": azure_di_json,
                     "filter_config": {
                         "filter_preset": preset,
                         "include_element_ids": True
@@ -207,7 +207,7 @@ class TestRealDataSegmentation:
             # Test with llm_ready preset (default for production)
             payload = {
                 "source_file": f"{filename}.pdf",
-                "analysis_result": azure_di_json,
+                "json_content": azure_di_json,
                 "filter_config": {
                     "filter_preset": "llm_ready",
                     "include_element_ids": True
@@ -261,7 +261,7 @@ class TestRealDataSegmentation:
             # Use forensic_extraction preset optimized for multi-doc
             payload = {
                 "source_file": f"{filename}.pdf",
-                "analysis_result": azure_di_json,
+                "json_content": azure_di_json,
                 "filter_config": {
                     "filter_preset": "forensic_extraction",
                     "include_element_ids": True
@@ -299,7 +299,7 @@ class TestRealDataSegmentation:
             for endpoint, use_filter in [("/segment", False), ("/segment-filtered", True)]:
                 payload = {
                     "source_file": f"{filename}.pdf",
-                    "analysis_result": azure_di_json,
+                    "json_content": azure_di_json,
                     "min_segment_tokens": 2000,
                     "max_segment_tokens": 6000
                 }
@@ -343,7 +343,7 @@ class TestRealDataSegmentation:
         
         payload = {
             "source_file": f"{filename}.pdf",
-            "analysis_result": azure_di_json,
+            "json_content": azure_di_json,
             "filter_config": {
                 "filter_preset": "llm_ready",
                 "include_element_ids": True
@@ -432,7 +432,7 @@ class TestSegmentationEdgeCases:
         
         payload = {
             "source_file": "long_segment.pdf",
-            "analysis_result": azure_di_json,
+            "json_content": azure_di_json,
             "min_segment_tokens": 1000,
             "max_segment_tokens": 3000  # Much smaller than content
         }
@@ -469,7 +469,7 @@ class TestSegmentationEdgeCases:
         
         payload = {
             "source_file": "sparse_document.pdf",
-            "analysis_result": azure_di_json,
+            "json_content": azure_di_json,
             "filter_config": {"filter_preset": "llm_ready"}
         }
         
@@ -506,7 +506,7 @@ class TestSegmentationEdgeCases:
         for preset in ["llm_ready", "forensic_extraction"]:
             payload = {
                 "source_file": "table_document.pdf",
-                "analysis_result": azure_di_json,
+                "json_content": azure_di_json,
                 "filter_config": {"filter_preset": preset}
             }
             

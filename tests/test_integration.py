@@ -6,6 +6,7 @@ Tests the complete workflow:
 """
 
 import io
+import pytest
 import json
 from pathlib import Path
 from fastapi.testclient import TestClient
@@ -13,6 +14,8 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
 
 from main import app
+
+pytestmark = pytest.mark.usefixtures("azure_credentials")
 
 client = TestClient(app)
 

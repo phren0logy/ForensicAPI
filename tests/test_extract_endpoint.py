@@ -10,12 +10,15 @@ Tests PDF extraction functionality including:
 
 import io
 import json
+import pytest
 from pathlib import Path
 from fastapi.testclient import TestClient
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
 
 from main import app
+
+pytestmark = pytest.mark.usefixtures("azure_credentials")
 
 client = TestClient(app)
 
@@ -88,7 +91,7 @@ def test_extract_with_element_ids():
         # Verify ID format
         first_id = paragraphs[0]["_id"]
         assert first_id.startswith("para_")
-        assert len(first_id.split("_")) == 4  # type_page_index_hash
+        assert len(first_id.split("_")) == 3  # type_page_hash
     
 
 def test_extract_without_element_ids():
@@ -180,13 +183,7 @@ def test_extract_empty_pdf():
 
 def test_extract_real_sample_pdf():
     """Test extraction with the real sample PDF if it exists."""
-    # Skip this test if running in CI or without Azure credentials
-    import os
-    if not os.environ.get("AZURE_DI_KEY"):
-        import pytest
-        pytest.skip("Skipping Azure DI test - no credentials")
-    
-    sample_pdf_path = Path(__file__).parent / "sample_pdfs" / "05dracula.pdf"
+    sample_pdf_path = Path(__file__).parent / "sample_pdfs" / "Stoker-Dracula.pdf"
     
     if sample_pdf_path.exists():
         with open(sample_pdf_path, "rb") as f:

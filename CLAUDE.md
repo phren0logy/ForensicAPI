@@ -4,15 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Recent Updates (2025-07-06)
 
-### Unified Extraction Endpoint Response Format
-- Both `/extract` and `/extract-local` now return the same response structure:
+### Extraction Format Update
+- `/extract` returns:
   - `markdown_content`: Markdown representation of the document
-  - `json_content`: Original processor output (Azure DI or Docling format)
-  - `metadata`: Processing information including type, timing, file details
-- Breaking changes:
-  - `/extract`: `analysis_result` → `json_content`
-  - `/extract-local`: `docling_document` → `json_content`, OCR info moved to metadata
-  - Segmentation endpoints: expect `json_content` instead of `analysis_result`
+  - `json_content`: Azure DI output
+  - `metadata`: Processing info including type, timing, file details
+- Docling conversion is performed externally via docling-serve; this API only post-processes those outputs.
+- Segmentation endpoints expect `json_content` instead of `analysis_result`
 
 ## Recent Updates (2025-06-20)
 

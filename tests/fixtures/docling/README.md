@@ -1,18 +1,17 @@
 # Docling Test Fixtures
 
-This directory contains test fixtures generated using the Docling local extraction endpoint.
+This directory contains test fixtures generated using docling-serve.
 
 ## Files
 
-- `*_docling.json` - Full Docling response including document structure
+- `*_docling.json` - Full docling-serve response including document structure
 - `*_markdown.md` - Extracted markdown content for easy reading
 
 ## Key Differences from Azure DI
 
 1. **Format**: Docling uses a different JSON structure with elements organized by page
 2. **Element IDs**: Docling doesn't currently generate element IDs
-3. **Filtering**: The /extract-local endpoint doesn't support filtering
-4. **OCR**: Uses ocrmac on macOS, EasyOCR on other platforms
+3. **OCR**: Controlled by docling-serve parameters
 
 ## Statistics
 

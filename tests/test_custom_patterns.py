@@ -20,7 +20,7 @@ def test_legal_pattern_detection():
     
     config = AnonymizationConfig(
         pattern_sets=["legal"],
-        entity_types=[],  # Only use custom patterns
+        entity_types=[],  # Use default entity types + custom patterns
         date_shift_days=0
     )
     

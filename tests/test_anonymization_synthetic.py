@@ -95,7 +95,7 @@ class TestAnonymizationWithSynthetic:
             request_data = {
                 "azure_di_json": synthetic_data,
                 "config": {
-                    "entity_types": None,  # Detect all entity types
+                    "entity_types": ["all"],  # Detect all supported entity types
                     "score_threshold": 0.5
                 }
             }

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Generate test fixtures using the Docling local extraction endpoint.
+Generate test fixtures using a docling-serve instance.
 
-This script processes PDFs through the /extract-local endpoint to create
-fixtures in Docling's native format for comparison with Azure DI results.
+This script processes PDFs through docling-serve to create fixtures in
+standard docling-serve v1 response format for comparison with Azure DI results.
 """
 
 import json
@@ -11,14 +11,15 @@ import os
 from pathlib import Path
 from typing import Dict, Any
 
-import requests
+import httpx
 from pypdf import PdfReader
 
 
 # --- Configuration ---
 SAMPLE_PDFS_DIR = Path("tests/sample_pdfs")
 FIXTURES_DIR = Path("tests/fixtures/docling")
-API_BASE_URL = "http://127.0.0.1:8000"
+DOCLING_SERVE_BASE_URL = os.getenv("DOCLING_SERVE_BASE_URL", "http://127.0.0.1:5001").rstrip("/")
+DOCLING_SERVE_API_KEY = os.getenv("DOCLING_SERVE_API_KEY")
 
 # PDFs to process
 PDF_FILES = [
@@ -37,29 +38,36 @@ def get_pdf_page_count(file_path: str) -> int:
 
 def process_pdf_with_docling(pdf_path: Path, ocr_enabled: bool = True) -> Dict[str, Any]:
     """
-    Process a PDF file through the /extract-local endpoint.
+    Process a PDF file through docling-serve.
     
     Args:
         pdf_path: Path to PDF file
         ocr_enabled: Whether to enable OCR
         
     Returns:
-        Response data from the endpoint
+        Response data from docling-serve
     """
-    print(f"  Sending {pdf_path.name} to /extract-local endpoint...")
-    
-    with open(pdf_path, 'rb') as f:
-        files = {'file': (pdf_path.name, f, 'application/pdf')}
+    print(f"  Sending {pdf_path.name} to docling-serve...")
+
+    headers = {}
+    if DOCLING_SERVE_API_KEY:
+        headers["X-Api-Key"] = DOCLING_SERVE_API_KEY
+
+    with open(pdf_path, "rb") as f:
+        files = {"files": (pdf_path.name, f, "application/pdf")}
         data = {
-            'ocr_enabled': str(ocr_enabled).lower(),
-            'ocr_lang': 'en'
+            "to_formats": ["md", "json"],
+            "do_ocr": str(ocr_enabled).lower(),
+            "ocr_lang": "en",
         }
-        
-        response = requests.post(
-            f"{API_BASE_URL}/extract-local",
-            files=files,
-            data=data
-        )
+
+        with httpx.Client(timeout=120.0) as client:
+            response = client.post(
+                f"{DOCLING_SERVE_BASE_URL}/v1/convert/file",
+                files=files,
+                data=data,
+                headers=headers,
+            )
     
     if response.status_code != 200:
         raise Exception(f"API returned status {response.status_code}: {response.text}")
@@ -82,7 +90,8 @@ def extract_statistics(docling_response: Dict[str, Any]) -> Dict[str, Any]:
     }
     
     # Get page count from docling document
-    docling_doc = docling_response.get("json_content", {})
+    document = docling_response.get("document", {})
+    docling_doc = document.get("json_content", {})
     pages = docling_doc.get("pages", {})
     stats["pages"] = len(pages)
     
@@ -114,19 +123,16 @@ def extract_statistics(docling_response: Dict[str, Any]) -> Dict[str, Any]:
 
 def main():
     """Main function to generate Docling fixtures."""
-    print("Docling Test Fixture Generator")
+    print("Docling-serve Test Fixture Generator")
     print("=" * 60)
     
-    # Check if server is running
+    # Check if docling-serve is reachable
     try:
-        response = requests.get(f"{API_BASE_URL}/health")
-        if response.status_code != 200:
-            print("Error: FastAPI server is not running at http://127.0.0.1:8000")
-            print("Please start the server with: uv run run.py")
-            return 1
-    except requests.ConnectionError:
-        print("Error: Cannot connect to FastAPI server at http://127.0.0.1:8000")
-        print("Please start the server with: uv run run.py")
+        with httpx.Client(timeout=5.0) as client:
+            client.get(DOCLING_SERVE_BASE_URL)
+    except httpx.RequestError:
+        print(f"Error: Cannot connect to docling-serve at {DOCLING_SERVE_BASE_URL}")
+        print("Please start docling-serve and/or set DOCLING_SERVE_BASE_URL.")
         return 1
     
     # Create output directory
@@ -162,13 +168,14 @@ def main():
             # Save just the markdown content for easy comparison
             markdown_path = FIXTURES_DIR / f"{base_name}_markdown.md"
             with open(markdown_path, 'w') as f:
-                f.write(response_data.get("markdown_content", ""))
+                document = response_data.get("document", {})
+                f.write(document.get("md_content", ""))
             print(f"  Saved markdown to: {markdown_path}")
             
             # Extract and print statistics
             stats = extract_statistics(response_data)
             stats["filename"] = pdf_filename
-            stats["ocr_applied"] = response_data.get("ocr_applied", False)
+            stats["ocr_applied"] = ocr_enabled
             all_stats.append(stats)
             
             print(f"  OCR applied: {stats['ocr_applied']}")
@@ -198,15 +205,14 @@ def main():
     readme_path = FIXTURES_DIR / "README.md"
     with open(readme_path, 'w') as f:
         f.write("# Docling Test Fixtures\n\n")
-        f.write("This directory contains test fixtures generated using the Docling local extraction endpoint.\n\n")
+        f.write("This directory contains test fixtures generated using docling-serve.\n\n")
         f.write("## Files\n\n")
-        f.write("- `*_docling.json` - Full Docling response including document structure\n")
+        f.write("- `*_docling.json` - Full docling-serve response including document structure\n")
         f.write("- `*_markdown.md` - Extracted markdown content for easy reading\n\n")
         f.write("## Key Differences from Azure DI\n\n")
         f.write("1. **Format**: Docling uses a different JSON structure with elements organized by page\n")
         f.write("2. **Element IDs**: Docling doesn't currently generate element IDs\n")
-        f.write("3. **Filtering**: The /extract-local endpoint doesn't support filtering\n")
-        f.write("4. **OCR**: Uses ocrmac on macOS, EasyOCR on other platforms\n\n")
+        f.write("3. **OCR**: Controlled by docling-serve parameters\n\n")
         f.write("## Statistics\n\n")
         for stats in all_stats:
             f.write(f"### {stats['filename']}\n")

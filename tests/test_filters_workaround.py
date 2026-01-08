@@ -49,7 +49,7 @@ for preset_name, filter_config in presets_config.items():
     
     payload = {
         "source_file": "test.pdf",
-        "analysis_result": azure_di_json,
+        "json_content": azure_di_json,
         "filter_config": filter_config,
         "min_segment_tokens": 2000,
         "max_segment_tokens": 6000
@@ -114,7 +114,7 @@ for config_name, filter_config in custom_configs.items():
     
     payload = {
         "source_file": "test.pdf",
-        "analysis_result": azure_di_json,
+        "json_content": azure_di_json,
         "filter_config": filter_config,
         "min_segment_tokens": 2000,
         "max_segment_tokens": 6000

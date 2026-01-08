@@ -2,7 +2,9 @@
 
 ## Overview
 
-This document outlines the design for adding intelligent document chunking capabilities to the `/extract-local` endpoint using Docling's chunking features. The goal is to provide users with semantically meaningful text chunks suitable for downstream processing in RAG pipelines, vector databases, and LLM applications.
+This document outlined a prior design for adding chunking to the now-removed `/extract-local` endpoint. Docling conversion is now performed externally via docling-serve, and chunking should be implemented as a separate API endpoint using docling-core utilities.
+
+> Note: The remainder of this document is historical and does not reflect the current API.
 
 ### Key Benefits
 

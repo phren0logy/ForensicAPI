@@ -1,6 +1,6 @@
 # Test Fixtures Documentation
 
-This directory contains test fixtures for the FastAPI document processing API, supporting both Azure Document Intelligence and Docling (local) extraction endpoints.
+This directory contains test fixtures for the FastAPI document processing API, supporting Azure Document Intelligence and external docling-serve outputs.
 
 ## Directory Structure
 
@@ -35,13 +35,10 @@ uv run python scripts/generate_test_fixtures.py
 
 ### 3. `scripts/generate_docling_fixtures.py`
 
-Generates Docling format fixtures through the `/extract-local` endpoint.
+Generates docling-serve fixtures directly from a running docling-serve instance.
 
 ```bash
-# Start the server first
-uv run run.py
-
-# In another terminal
+DOCLING_SERVE_BASE_URL=http://127.0.0.1:5001 \
 uv run python scripts/generate_docling_fixtures.py
 ```
 
@@ -68,14 +65,13 @@ Located in `tests/sample_pdfs/`:
 
 ## Element ID Format
 
-Element IDs follow the pattern: `{element_type}_{page}_{index}_{hash}`
+Element IDs follow the pattern: `{element_type}_{page}_{hash}`
 
 - `element_type`: para, table, cell, kv, list, fig, formula
 - `page`: Page number where element appears
-- `index`: Global index of this element type
-- `hash`: 6-character hash of content for uniqueness
+- `hash`: 8-character hash derived from stable anchors (spans, bounds, or content)
 
-Example: `para_1_0_a3f2b1`
+Example: `para_1_a3f2b1c4`
 
 ## Testing Approach
 
@@ -85,11 +81,11 @@ Example: `para_1_0_a3f2b1`
 - Validates batch processing and stitching
 - Ensures ID uniqueness and preservation
 
-### 2. Docling Testing (`/extract-local`)
+### 2. Docling Testing (docling-serve outputs)
 
-- Tests local extraction without external API calls
-- Validates OCR functionality
-- Note: Currently doesn't support element IDs or filtering
+- Uses pre-converted docling-serve fixtures
+- Validates downstream post-processing compatibility (e.g., anonymization, chunking)
+- Note: Docling outputs don't include element IDs or Azure DI filtering
 
 ### 3. Comparison Testing
 
@@ -104,7 +100,7 @@ Example: `para_1_0_a3f2b1`
 | Element IDs      | ✅ Supported     | ❌ Not yet                |
 | Filtering        | ✅ Supported     | ❌ Not yet                |
 | Batch Processing | ✅ Built-in      | ❌ Single file            |
-| OCR              | ✅ Cloud-based   | ✅ Local (ocrmac/EasyOCR) |
+| OCR              | ✅ Cloud-based   | ✅ Configurable in docling-serve |
 | Format           | Azure DI JSON    | Docling JSON              |
 | Cost             | Per-page pricing | Free (local)              |
 

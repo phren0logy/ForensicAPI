@@ -15,7 +15,7 @@ from azure.core.credentials import AzureKeyCredential
 from fastapi import APIRouter, File, Form, UploadFile
 from fastapi.responses import JSONResponse
 from pypdf import PdfReader
-from utils import ensure_env_loaded
+from utils import ensure_env_loaded, generate_stable_element_id
 
 # Import segmentation functionality
 from .segmentation import create_rich_segments
@@ -24,25 +24,28 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-def generate_element_id(element_type: str, page_number: int, index: int, content: str = "") -> str:
-    """
-    Generate a unique, stable ID for an element.
-    
-    Args:
-        element_type: Type of element (paragraph, table, cell, etc.)
-        page_number: Page number where element appears
-        index: Global index of this element type in the document
-        content: Content of the element (first 50 chars used for hash)
-    
-    Returns:
-        Unique ID in format: {type}_{page}_{index}_{hash}
-    """
-    # Create a hash from content for uniqueness
-    content_preview = content[:50] if content else ""
-    hash_input = f"{element_type}_{page_number}_{index}_{content_preview}"
-    content_hash = hashlib.md5(hash_input.encode()).hexdigest()[:6]
-    
-    return f"{element_type}_{page_number}_{index}_{content_hash}"
+def generate_element_id(
+    element_type: str,
+    page_number: int,
+    index: int,
+    content: str = "",
+    *,
+    span_offset: Optional[int] = None,
+    span_length: Optional[int] = None,
+    bbox: Optional[List[float]] = None,
+    anchor: Optional[str] = None,
+) -> str:
+    """Generate a stable ID for an element using spans/bounds when available."""
+    return generate_stable_element_id(
+        element_type,
+        page_number,
+        content=content[:200] if content else "",
+        span_offset=span_offset,
+        span_length=span_length,
+        bbox=bbox,
+        anchor=anchor,
+        index=index,
+    )
 
 
 def add_ids_to_elements(analysis_result: Dict[str, Any]) -> Dict[str, Any]:
@@ -83,7 +86,23 @@ def add_ids_to_elements(analysis_result: Dict[str, Any]) -> Dict[str, Any]:
                 page_num = para["boundingRegions"][0].get("pageNumber", 1)
             
             content = para.get("content", "")
-            para["_id"] = generate_element_id("para", page_num, indices["para"], content)
+            span_offset = None
+            span_length = None
+            if para.get("spans"):
+                span_offset = para["spans"][0].get("offset")
+                span_length = para["spans"][0].get("length")
+            bbox = None
+            if "boundingRegions" in para and para["boundingRegions"]:
+                bbox = para["boundingRegions"][0].get("polygon")
+            para["_id"] = generate_element_id(
+                "para",
+                page_num,
+                indices["para"],
+                content,
+                span_offset=span_offset,
+                span_length=span_length,
+                bbox=bbox,
+            )
             indices["para"] += 1
     
     # Add IDs to tables and their cells
@@ -93,8 +112,24 @@ def add_ids_to_elements(analysis_result: Dict[str, Any]) -> Dict[str, Any]:
             if "boundingRegions" in table and table["boundingRegions"]:
                 page_num = table["boundingRegions"][0].get("pageNumber", 1)
             
+            span_offset = None
+            span_length = None
+            if table.get("spans"):
+                span_offset = table["spans"][0].get("offset")
+                span_length = table["spans"][0].get("length")
+            bbox = None
+            if "boundingRegions" in table and table["boundingRegions"]:
+                bbox = table["boundingRegions"][0].get("polygon")
             # Generate table ID
-            table_id = generate_element_id("table", page_num, indices["table"], "")
+            table_id = generate_element_id(
+                "table",
+                page_num,
+                indices["table"],
+                "",
+                span_offset=span_offset,
+                span_length=span_length,
+                bbox=bbox,
+            )
             table["_id"] = table_id
             indices["table"] += 1
             
@@ -103,8 +138,27 @@ def add_ids_to_elements(analysis_result: Dict[str, Any]) -> Dict[str, Any]:
                 for j, cell in enumerate(table["cells"]):
                     row = cell.get("rowIndex", 0)
                     col = cell.get("columnIndex", 0)
+                    row_span = cell.get("rowSpan", 1)
+                    col_span = cell.get("columnSpan", 1)
                     content = cell.get("content", "")
-                    cell["_id"] = f"cell_{page_num}_{indices['table']-1}_{row}_{col}_{hashlib.md5(content.encode()).hexdigest()[:6]}"
+                    cell_span_offset = None
+                    cell_span_length = None
+                    if cell.get("spans"):
+                        cell_span_offset = cell["spans"][0].get("offset")
+                        cell_span_length = cell["spans"][0].get("length")
+                    cell_bbox = None
+                    if "boundingRegions" in cell and cell["boundingRegions"]:
+                        cell_bbox = cell["boundingRegions"][0].get("polygon")
+                    cell["_id"] = generate_element_id(
+                        "cell",
+                        page_num,
+                        indices["table"] - 1,
+                        content,
+                        span_offset=cell_span_offset,
+                        span_length=cell_span_length,
+                        bbox=cell_bbox,
+                        anchor=f"cell:{row}:{col}:{row_span}:{col_span}",
+                    )
     
     # Add IDs to key-value pairs
     if "keyValuePairs" in result:
@@ -115,7 +169,24 @@ def add_ids_to_elements(analysis_result: Dict[str, Any]) -> Dict[str, Any]:
             value_content = kv.get("value", {}).get("content", "")
             content = f"{key_content}:{value_content}"
             
-            kv["_id"] = generate_element_id("kv", page_num, indices["kv"], content)
+            span_offset = None
+            span_length = None
+            key_spans = kv.get("key", {}).get("spans", [])
+            value_spans = kv.get("value", {}).get("spans", [])
+            if key_spans:
+                span_offset = key_spans[0].get("offset")
+                span_length = key_spans[0].get("length")
+            elif value_spans:
+                span_offset = value_spans[0].get("offset")
+                span_length = value_spans[0].get("length")
+            kv["_id"] = generate_element_id(
+                "kv",
+                page_num,
+                indices["kv"],
+                content,
+                span_offset=span_offset,
+                span_length=span_length,
+            )
             indices["kv"] += 1
     
     # Add IDs to lists
@@ -125,7 +196,23 @@ def add_ids_to_elements(analysis_result: Dict[str, Any]) -> Dict[str, Any]:
             if "boundingRegions" in lst and lst["boundingRegions"]:
                 page_num = lst["boundingRegions"][0].get("pageNumber", 1)
             
-            lst["_id"] = generate_element_id("list", page_num, indices["list"], "")
+            span_offset = None
+            span_length = None
+            if lst.get("spans"):
+                span_offset = lst["spans"][0].get("offset")
+                span_length = lst["spans"][0].get("length")
+            bbox = None
+            if "boundingRegions" in lst and lst["boundingRegions"]:
+                bbox = lst["boundingRegions"][0].get("polygon")
+            lst["_id"] = generate_element_id(
+                "list",
+                page_num,
+                indices["list"],
+                "",
+                span_offset=span_offset,
+                span_length=span_length,
+                bbox=bbox,
+            )
             indices["list"] += 1
     
     # Add IDs to figures
@@ -135,7 +222,23 @@ def add_ids_to_elements(analysis_result: Dict[str, Any]) -> Dict[str, Any]:
             if "boundingRegions" in fig and fig["boundingRegions"]:
                 page_num = fig["boundingRegions"][0].get("pageNumber", 1)
             
-            fig["_id"] = generate_element_id("fig", page_num, indices["fig"], "")
+            span_offset = None
+            span_length = None
+            if fig.get("spans"):
+                span_offset = fig["spans"][0].get("offset")
+                span_length = fig["spans"][0].get("length")
+            bbox = None
+            if "boundingRegions" in fig and fig["boundingRegions"]:
+                bbox = fig["boundingRegions"][0].get("polygon")
+            fig["_id"] = generate_element_id(
+                "fig",
+                page_num,
+                indices["fig"],
+                "",
+                span_offset=span_offset,
+                span_length=span_length,
+                bbox=bbox,
+            )
             indices["fig"] += 1
     
     # Add IDs to formulas
@@ -146,7 +249,23 @@ def add_ids_to_elements(analysis_result: Dict[str, Any]) -> Dict[str, Any]:
                 page_num = formula["boundingRegions"][0].get("pageNumber", 1)
             
             content = formula.get("value", "")
-            formula["_id"] = generate_element_id("formula", page_num, indices["formula"], content)
+            span_offset = None
+            span_length = None
+            if formula.get("spans"):
+                span_offset = formula["spans"][0].get("offset")
+                span_length = formula["spans"][0].get("length")
+            bbox = None
+            if "boundingRegions" in formula and formula["boundingRegions"]:
+                bbox = formula["boundingRegions"][0].get("polygon")
+            formula["_id"] = generate_element_id(
+                "formula",
+                page_num,
+                indices["formula"],
+                content,
+                span_offset=span_offset,
+                span_length=span_length,
+                bbox=bbox,
+            )
             indices["formula"] += 1
     
     return result
@@ -249,11 +368,32 @@ def validate_batch_sequence(batches: List[Dict[str, Any]]) -> None:
             raise ValueError(f"Non-consecutive batches: gap between page {prev_max} and {curr_min}")
 
 
+def _apply_offsets_to_result(result: Any, content_offset: int, page_offset: int) -> None:
+    """Recursively apply content/page offsets to Azure DI result structures."""
+    if isinstance(result, dict):
+        for key, value in result.items():
+            if key == "spans" and isinstance(value, list):
+                for span in value:
+                    if isinstance(span, dict) and isinstance(span.get("offset"), int):
+                        span["offset"] += content_offset
+            elif key == "span" and isinstance(value, dict):
+                if isinstance(value.get("offset"), int):
+                    value["offset"] += content_offset
+            elif key == "pageNumber" and isinstance(value, int):
+                result[key] = value + page_offset
+
+            if isinstance(value, (dict, list)):
+                _apply_offsets_to_result(value, content_offset, page_offset)
+    elif isinstance(result, list):
+        for item in result:
+            _apply_offsets_to_result(item, content_offset, page_offset)
+
+
 def stitch_analysis_results(
-    stitched_result: Dict[str, Any], 
-    new_result: Dict[str, Any], 
+    stitched_result: Dict[str, Any],
+    new_result: Dict[str, Any],
     page_offset: Optional[int] = None,
-    validate_inputs: bool = True
+    validate_inputs: bool = True,
 ) -> Dict[str, Any]:
     """
     Stitches a new analysis result dictionary into an existing one.
@@ -282,38 +422,27 @@ def stitch_analysis_results(
     
     # Handle first batch case
     if not stitched_result:
-        # For the first batch, we just need to update page numbers if offset is needed
+        # For the first batch, only page numbers need offset adjustments
         if page_offset != 0:
-            for page in new_result.get("pages", []):
-                page["pageNumber"] += page_offset
-            for element in new_result.get("paragraphs", []) + new_result.get("tables", []):
-                for region in element.get("boundingRegions", []):
-                    region["pageNumber"] += page_offset
+            _apply_offsets_to_result(new_result, 0, page_offset)
         return new_result
 
     content_offset = len(stitched_result["content"])
     concatenated_content = stitched_result["content"] + new_result["content"]
 
-    # Update spans and page numbers in all relevant elements
-    for element_list_key in ["pages", "paragraphs", "tables", "words", "lines", "selectionMarks"]:
-        for element in new_result.get(element_list_key, []):
-            # Handle both "spans" (for paragraphs, lines, etc.) and "span" (for words)
-            if "spans" in element:
-                for span in element["spans"]:
-                    span["offset"] += content_offset
-            elif "span" in element:
-                element["span"]["offset"] += content_offset
-            if "pageNumber" in element:
-                element["pageNumber"] += page_offset
-            if "boundingRegions" in element:
-                for region in element["boundingRegions"]:
-                    region["pageNumber"] += page_offset
+    # Update spans and page numbers in all elements (including nested page structures)
+    _apply_offsets_to_result(new_result, content_offset, page_offset)
 
-    # Append the updated elements to the stitched result
-    for key in ["pages", "paragraphs", "tables", "words", "lines", "selectionMarks"]:
-        if key not in stitched_result:
-            stitched_result[key] = []
-        stitched_result[key].extend(new_result.get(key, []))
+    # Append the updated list elements to the stitched result
+    for key, value in new_result.items():
+        if key == "content":
+            continue
+        if isinstance(value, list):
+            if key not in stitched_result:
+                stitched_result[key] = []
+            stitched_result[key].extend(value)
+        elif key not in stitched_result:
+            stitched_result[key] = value
 
     stitched_result["content"] = concatenated_content
     return stitched_result

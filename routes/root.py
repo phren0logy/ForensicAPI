@@ -17,7 +17,8 @@ def read_root():
             "\n- POST /extract : PDF extraction endpoint with Azure Document Intelligence."
             "\n- POST /segment : Document segmentation endpoint."
             "\n- POST /segment-filtered : Combined filtering and segmentation endpoint."
-            "\n- POST /anonymize-azure-di : PII anonymization for Azure DI output."
+            "\n- POST /segment-docling : Chunk docling-serve responses into rich segments."
+            "\n- POST /anonymization/anonymize-azure-di : PII anonymization for Azure DI output."
             "\n- POST /compose-prompt : Composes a prompt from a mapping and optional uploaded files. "
             "Send a multipart/form-data request with a 'mapping' JSON field and optional files. Returns a composed prompt with each section wrapped in XML tags."
         )
