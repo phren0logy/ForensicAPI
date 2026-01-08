@@ -1,10 +1,17 @@
 from pathlib import Path
 import os
+import warnings
 
 import pytest
 from fastapi.testclient import TestClient
 
 from main import app
+
+warnings.filterwarnings(
+    "ignore",
+    message=".*NVML.*",
+    category=UserWarning,
+)
 
 
 @pytest.fixture(scope="session")
