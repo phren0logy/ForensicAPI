@@ -40,6 +40,13 @@ class FilteredElement(BaseModel):
     columnIndex: Optional[int] = None
     columnHeader: Optional[str] = None
     kind: Optional[str] = None  # For cell types
+    # Selection-mark fields. A located mark with an id is not evidence; a mark BOUND to its
+    # label is. `state` is selected/unselected, `boundTo` is the id of the paragraph, table cell
+    # or key-value pair whose span contains this mark's span.
+    state: Optional[str] = None
+    confidence: Optional[float] = None
+    boundTo: Optional[str] = None
+    boundToText: Optional[str] = None
     
     model_config = {
         "populate_by_name": True,
@@ -225,6 +232,20 @@ def extract_elements_from_azure_di(analysis_result: Dict[str, Any]) -> List[Dict
                 elem["pageNumber"] = page_number
                 elem["elementType"] = element_type.rstrip("s")  # Remove plural
                 elements.append(elem)
+
+        # ⚠️ Selection marks and barcodes are page-level and were in NEITHER list, so they
+        # reached no consumer at all. Measured on a real response: assigning them ids changed
+        # the filtered output by exactly zero elements. They are not de-duplicated against
+        # paragraphs the way lines are, because their content is a STATE, not text that
+        # already appears elsewhere.
+        for elem in page.get("selectionMarks", []) or []:
+            elem["pageNumber"] = page_number
+            elem["elementType"] = "selectionMark"
+            elements.append(elem)
+        for elem in page.get("barcodes", []) or []:
+            elem["pageNumber"] = page_number
+            elem["elementType"] = "barcode"
+            elements.append(elem)
     
     # Add document-level elements
     for element_type in ["paragraphs", "tables", "figures", "lists", "keyValuePairs"]:

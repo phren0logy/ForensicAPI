@@ -51,8 +51,11 @@ nothing assigns them IDs or surfaces them, and `FilteredElement` has no field fo
 (`selected`/`unselected`) and a confidence.** Against adjudicated truth: **17/18 pages exact,
 314/314 marks found, 313/314 states correct.**
 
-**Azure is the only parser measured that emits checkbox state as a first-class located element
-rather than as a glyph in prose.** For form-heavy evidence this is often the answer the document
+⚠️ **Corrected after review: Azure is the most ACCURATE parser measured on this dimension, not
+the only one that locates marks.** docling emits `checkbox_selected`/`checkbox_unselected` items
+with `prov` bboxes — a fixture in this very repo shows it — and PP-DocLayout locates them badly
+(1 of 18 pages exact). The original claim here was an overclaim of the exact kind this project
+keeps correcting: asserting a capability is absent from another tool without checking. For form-heavy evidence this is often the answer the document
 exists to record, and a markdown-only path reduces it to `☐`/`☒` characters whose association
 with a label has to be re-derived by text proximity.
 

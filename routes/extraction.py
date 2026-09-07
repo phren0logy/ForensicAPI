@@ -312,11 +312,16 @@ def add_ids_to_elements(analysis_result: Dict[str, Any]) -> Dict[str, Any]:
 
         # ⚠️ Checkbox state. Measured over 18 form pages: 314 selection marks, each carrying a
         # polygon, a state and a confidence -- 314/314 found and 313/314 states correct against
-        # adjudicated truth. Azure is the only parser measured that emits these as first-class
-        # LOCATED elements rather than as glyphs in prose, and on form evidence the mark is
-        # frequently the answer the document exists to record.
+        # adjudicated truth, and on form evidence the mark is frequently the answer the document
+        # exists to record.
+        #
+        # Azure is the most ACCURATE parser measured on this dimension, not the only one that
+        # locates marks: docling emits `checkbox_selected` / `checkbox_unselected` items with
+        # `prov` bboxes (see tests/fixtures/docling/), and PP-DocLayout locates them too, badly
+        # (1 of 18 pages exact). The distinction matters because a second parser will need this
+        # same handling under different key names -- so do not read this loop as Azure-only.
         for mark in page.get("selectionMarks", []) or []:
-            span = (mark.get("spans") or [{}])[0]
+            span = _element_span(mark)
             mark["_id"] = generate_element_id(
                 "mark", page_num, indices["mark"], mark.get("state", ""),
                 span_offset=span.get("offset"), span_length=span.get("length"),
@@ -333,7 +338,7 @@ def add_ids_to_elements(analysis_result: Dict[str, Any]) -> Dict[str, Any]:
         # so binding on x makes a dropped cell surface as a gap in the grid rather than as a
         # silent renumbering of every value after it.
         for line in page.get("lines", []) or []:
-            span = (line.get("spans") or [{}])[0]
+            span = _element_span(line)
             line["_id"] = generate_element_id(
                 "line", page_num, indices["line"], line.get("content", ""),
                 span_offset=span.get("offset"), span_length=span.get("length"),
@@ -341,6 +346,81 @@ def add_ids_to_elements(analysis_result: Dict[str, Any]) -> Dict[str, Any]:
             )
             indices["line"] += 1
 
+    return result
+
+
+def _element_span(elem: Dict[str, Any]) -> Dict[str, Any]:
+    """First span of an element, tolerating BOTH Azure span shapes.
+
+    ⚠️ Azure is not uniform here and it cost a silent zero: paragraphs, cells and key-value
+    pairs carry `spans` (a LIST), while selection marks, words and lines carry `span` (a single
+    OBJECT). Code written for the plural form reads `None` off a mark, so span-anchored ids fall
+    back to a bbox anchor and span containment binds nothing -- with no error anywhere.
+    """
+    if isinstance(elem.get("spans"), list) and elem["spans"]:
+        return elem["spans"][0] or {}
+    if isinstance(elem.get("span"), dict):
+        return elem["span"]
+    return {}
+
+
+def bind_selection_marks(result: Dict[str, Any]) -> Dict[str, Any]:
+    """Bind each selection mark to the labelled element whose span contains it.
+
+    ⚠️ **A located mark with an id is not evidence. A mark bound to its label is.** The whole
+    point of checkbox extraction on form evidence is knowing WHICH question was answered, and a
+    polygon plus a state does not say that -- something still has to associate the mark with the
+    text beside it.
+
+    Azure gives the association away for free and nothing was using it: a mark's `spans[0]` falls
+    inside exactly one paragraph span, table-cell span, or keyValuePairs value span, because they
+    all index the same `content` string. So this is span containment, not geometric proximity --
+    no distance threshold, no reading-order guess, no tuning. Where containment finds nothing the
+    mark is left unbound rather than attached to a nearest guess, because a mark bound to the
+    WRONG label is worse than one left unbound: the first is a wrong answer in a report, the
+    second is a gap somebody notices.
+
+    Sets `_bound_to` (element id) and `_bound_to_text` on each mark it can place. Idempotent.
+    """
+    candidates: List[Tuple[int, int, str, str]] = []
+
+    def _add(elem, kind):
+        sp = _element_span(elem)
+        off, ln = sp.get("offset"), sp.get("length")
+        if isinstance(off, int) and isinstance(ln, int):
+            candidates.append((off, off + ln, elem.get("_id", ""), elem.get("content", "")))
+
+    for para in result.get("paragraphs") or []:
+        _add(para, "paragraph")
+    for table in result.get("tables") or []:
+        for cell in table.get("cells") or []:
+            _add(cell, "cell")
+    for kv in result.get("keyValuePairs") or []:
+        key = kv.get("key") or {}
+        if key:
+            _add(key, "kvkey")
+
+    # Narrowest containing span wins: a cell inside a table inside a paragraph should bind to
+    # the cell, which is the most specific label available.
+    bound = 0
+    for page in result.get("pages") or []:
+        for mark in page.get("selectionMarks") or []:
+            sp = _element_span(mark)
+            off = sp.get("offset")
+            if not isinstance(off, int):
+                continue
+            best = None
+            for start, end, eid, text in candidates:
+                if start <= off < end and (best is None or (end - start) < best[0]):
+                    best = (end - start, eid, text)
+            if best:
+                mark["_bound_to"] = best[1]
+                mark["_bound_to_text"] = best[2][:200]
+                bound += 1
+    result["_selection_mark_binding"] = {
+        "bound": bound,
+        "total": sum(len(p.get("selectionMarks") or []) for p in result.get("pages") or []),
+    }
     return result
 
 
@@ -687,6 +767,8 @@ async def extract(
             if include_element_ids:
                 # Add IDs to elements
                 analysis_result_with_ids = add_ids_to_elements(analysis_result)
+                # Marks must have ids before they can name what they bind to.
+                analysis_result_with_ids = bind_selection_marks(analysis_result_with_ids)
                 json_content = analysis_result_with_ids
             else:
                 # Return original without IDs
