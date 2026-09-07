@@ -10,7 +10,11 @@ import copy
 from azure.ai.documentintelligence.aio import (
     DocumentIntelligenceClient as AsyncDocumentIntelligenceClient,
 )
-from azure.ai.documentintelligence.models import AnalyzeResult
+from azure.ai.documentintelligence.models import (
+    AnalyzeResult,
+    DocumentAnalysisFeature,
+    StringIndexType,
+)
 from azure.core.credentials import AzureKeyCredential
 from fastapi import APIRouter, File, Form, UploadFile
 from fastapi.responses import JSONResponse
@@ -19,6 +23,24 @@ from utils import ensure_env_loaded, generate_stable_element_id
 
 # Import segmentation functionality
 from .segmentation import create_rich_segments
+
+# Free add-ons. None is enabled by default and all three cost nothing.
+#   keyValuePairs -- the strongest value-binding channel Azure has (see the analyze call)
+#   barcodes      -- located, with kind and value
+#   languages     -- per-line locale, useful for routing and for spotting OCR nonsense
+# ⚠️ Deliberately EXCLUDES ocrHighResolution: it is a paid add-on at +60% and the vendor scopes
+# it to "small text from large-size documents, like engineering drawings" / A1-A3 sizes. Measured
+# on letter-size pages it changed nothing.
+# Input size above which the server-side Code: Timeout has been observed (see analyze_range).
+AZURE_TIMEOUT_RISK_MB = 20.0
+# Cap on simultaneous in-flight batches; see the note where the semaphore is created.
+AZURE_MAX_CONCURRENT_BATCHES = 4
+
+AZURE_FREE_FEATURES = [
+    DocumentAnalysisFeature.KEY_VALUE_PAIRS,
+    DocumentAnalysisFeature.BARCODES,
+    DocumentAnalysisFeature.LANGUAGES,
+]
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -76,6 +98,8 @@ def add_ids_to_elements(analysis_result: Dict[str, Any]) -> Dict[str, Any]:
         "list": 0,
         "fig": 0,
         "formula": 0,
+        "mark": 0,
+        "line": 0,
     }
     
     # Add IDs to paragraphs
@@ -267,7 +291,56 @@ def add_ids_to_elements(analysis_result: Dict[str, Any]) -> Dict[str, Any]:
                 bbox=bbox,
             )
             indices["formula"] += 1
-    
+
+    # ------------------------------------------------------------------ page-level elements
+    # Everything above is document-level. Selection marks and lines live under pages[] and were
+    # previously given no ids and surfaced nowhere, dropping two whole classes of evidence.
+    for page in result.get("pages", []) or []:
+        page_num = page.get("pageNumber", 1)
+
+        # ⚠️ Azure reports polygon coordinates in the page's OWN `unit`, which on PDF input is
+        # INCH -- measured on 18 gold pages across born-digital and full-page-scan strata, never
+        # mixed within a document. Page size comes back as e.g. 8.5 x 11, NOT 612 x 792. Any
+        # consumer that assumes points is wrong by a factor of 72 and any consumer that assumes
+        # the source PDF's dimensions is using the wrong denominator entirely. Record the frame
+        # next to the coordinates so a downstream reader never has to guess it.
+        page["_geometry"] = {
+            "unit": page.get("unit"),
+            "width": page.get("width"),
+            "height": page.get("height"),
+        }
+
+        # ⚠️ Checkbox state. Measured over 18 form pages: 314 selection marks, each carrying a
+        # polygon, a state and a confidence -- 314/314 found and 313/314 states correct against
+        # adjudicated truth. Azure is the only parser measured that emits these as first-class
+        # LOCATED elements rather than as glyphs in prose, and on form evidence the mark is
+        # frequently the answer the document exists to record.
+        for mark in page.get("selectionMarks", []) or []:
+            span = (mark.get("spans") or [{}])[0]
+            mark["_id"] = generate_element_id(
+                "mark", page_num, indices["mark"], mark.get("state", ""),
+                span_offset=span.get("offset"), span_length=span.get("length"),
+                bbox=mark.get("polygon"),
+            )
+            indices["mark"] += 1
+
+        # ⚠️ Lines. Measured on identical stored output: at LINE granularity a parser reads
+        # 100% hit@0.5 / 0.91 median IoU where the SAME output at PARAGRAPH granularity reads
+        # 63% / 0.79 -- a 37-point swing with the vendor held constant. Lines are also the only
+        # safe reader for a page class that binds values POSITIONALLY (parallel runs of names
+        # and values associated by ordinal position alone): on one such page Azure returned 0
+        # tables but 80 located lines on a 0.250 in column pitch, worst misalignment 0.0030 in,
+        # so binding on x makes a dropped cell surface as a gap in the grid rather than as a
+        # silent renumbering of every value after it.
+        for line in page.get("lines", []) or []:
+            span = (line.get("spans") or [{}])[0]
+            line["_id"] = generate_element_id(
+                "line", page_num, indices["line"], line.get("content", ""),
+                span_offset=span.get("offset"), span_length=span.get("length"),
+                bbox=line.get("polygon"),
+            )
+            indices["line"] += 1
+
     return result
 
 
@@ -460,6 +533,19 @@ async def analyze_pdf_in_batches(
 
     async def analyze_range(page_start, page_end):
         page_range_str = f"{page_start}-{page_end}"
+        # ⚠️ INPUT SIZE, not page count, provokes the server-side `Code: Timeout`. Measured: a
+        # ~26 MB rasterised page failed after 383 s across three attempts and returned NO
+        # AnalyzeResult at all -- it surfaces as an SDK exception, not as a `succeeded` result
+        # carrying `warnings` and not as a `failed` operation with error.details[]. The same page
+        # as a native PDF took ~8 s, and re-rendered at 300 dpi JPEG (0.73 MB) it succeeded with
+        # no retries. Warn early; the request is still worth attempting.
+        size_mb = os.path.getsize(file_path) / 1e6
+        if size_mb > AZURE_TIMEOUT_RISK_MB:
+            logger.warning(
+                f"Range {page_range_str}: input is {size_mb:.1f} MB, above the "
+                f"{AZURE_TIMEOUT_RISK_MB} MB threshold where server-side Code: Timeout has been "
+                f"observed. Consider re-rendering at a realistic scan resolution."
+            )
         logger.info(f"Starting analysis of page range: {page_range_str}")
         with open(file_path, "rb") as f:
             logger.info(f"File opened for range {page_range_str}")
@@ -468,6 +554,18 @@ async def analyze_pdf_in_batches(
                 f.read(),
                 pages=page_range_str,
                 output_content_format="markdown",
+                # All three are FREE add-ons and none is on by default. keyValuePairs matters
+                # most: measured against 37 adjudicated cell-binding assertions, Azure's
+                # keyValuePairs bound 22 with 0 misbound where its markdown bound 11. Without
+                # this argument `result["keyValuePairs"]` is never populated and the branch that
+                # reads it below is dead code.
+                features=AZURE_FREE_FEATURES,
+                # ⚠️ MUST match the offset arithmetic in stitch_analysis_results, which adds
+                # Python len() -- i.e. CODEPOINTS. The service default is "textElements"
+                # (grapheme clusters); the two agree on ASCII and diverge on any combining mark,
+                # so every batch after the first would carry silently mis-offset spans on exactly
+                # the documents most likely to matter.
+                string_index_type=StringIndexType.UNICODE_CODE_POINT,
                 content_type="application/pdf"
             )
             logger.info(f"Got poller for range {page_range_str}")
@@ -475,6 +573,17 @@ async def analyze_pdf_in_batches(
             logger.info(f"Got result for range {page_range_str}")
             # Convert to dict immediately
             all_results.append((page_start - 1, result.as_dict()))
+
+    # ⚠️ Previously every batch was dispatched at once. Measured: zero 429s and zero throttling
+    # over 97 pages -- which does NOT test a large document dispatched at full width, and the
+    # resource SKU is not visible from the client (an F0 tier carries a hard daily cap). Treat
+    # the absence of observed throttling as untested rather than as headroom.
+    sem = asyncio.Semaphore(AZURE_MAX_CONCURRENT_BATCHES)
+    _analyze_one = analyze_range
+
+    async def analyze_range(page_start, page_end):  # noqa: F811 - bounded wrapper
+        async with sem:
+            return await _analyze_one(page_start, page_end)
 
     tasks = []
     for i in range(1, total_pages + 1, batch_size):
